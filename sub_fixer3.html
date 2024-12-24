@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕修正工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 80%;
+            max-width: 800px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #3498db;
+        }
+
+        .input-section, .output-section {
+            margin-bottom: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical; /* 允許垂直調整大小 */
+        }
+
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+       .button-section {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .button-section input[type="checkbox"] {
+        margin-left: 10px;
+        margin-right: 5px;
+      }
+
+      .button-section label {
+        margin-right: 10px;
+        margin-left: 5px;
+      }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>字幕修正工具</h1>
+        
+        <div class="input-section">
+            <p>請上傳字幕檔或直接貼上內容</p>
+            <input type="file" id="subtitleFile" accept=".txt,.srt"><br>
+            <textarea id="subtitleText" placeholder="或直接在此貼上字幕內容"></textarea>
+        </div>
+
+        <div class="input-section">
+            <p>請上傳修正檔或直接貼上內容</p>
+            <input type="file" id="correctionFile" accept=".txt"><br>
+            <textarea id="correctionText" placeholder="或直接在此貼上修正檔內容"></textarea>
+        </div>
+        
+        <div class="button-section">
+          <button id="fixButton">修正字幕</button>
+            <input type="checkbox" id="removeBrackets">
+            <label for="removeBrackets">是否去除修正檔括號內容</label>
+        </div>
+
+        <div class="output-section">
+            <p>修正後的字幕將顯示在這裡...</p>
+            <textarea id="outputText" readonly></textarea>
+            <button id="downloadButton">下載修正字幕</button>
+        </div>
+    </div>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+          const subtitleFile = document.getElementById('subtitleFile');
+          const subtitleText = document.getElementById('subtitleText');
+          const correctionFile = document.getElementById('correctionFile');
+          const correctionText = document.getElementById('correctionText');
+          const fixButton = document.getElementById('fixButton');
+          const outputText = document.getElementById('outputText');
+          const removeBrackets = document.getElementById('removeBrackets');
+          const downloadButton = document.getElementById('downloadButton');
+
+          let correctedSubtitle = "";
+        
+            // 讀取檔案內容到textarea
+            function readFile(file, textarea) {
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (e) => {
+                      textarea.value = e.target.result;
+                  };
+                  reader.readAsText(file);
+                }
+              }
+            
+              subtitleFile.addEventListener('change', () => readFile(subtitleFile.files[0], subtitleText));
+              correctionFile.addEventListener('change', () => readFile(correctionFile.files[0], correctionText));
+
+          fixButton.addEventListener('click', () => {
+              const subtitle = subtitleText.value;
+              const correction = correctionText.value;
+              const shouldRemoveBrackets = removeBrackets.checked;
+
+              if (!subtitle || !correction) {
+                  alert("請上傳或貼上字幕和修正內容");
+                  return;
+              }
+              const correctionMap = parseCorrection(correction, shouldRemoveBrackets);
+              const result = applyCorrections(subtitle, correctionMap);
+
+              outputText.value = `總共修正了 ${result.correctionCount} 處字幕錯誤：\n\n${result.outputLog}`;
+              correctedSubtitle = result.correctedSubtitle;
+          });
+
+            // 解析修正規則
+        function parseCorrection(text, shouldRemoveBrackets) {
+            const corrections = {};
+            const lines = text.split('\n').filter(line => line.trim() !== '');
+
+            for (let i = 0; i < lines.length; i += 2) {
+                const originalLine = lines[i].trim();
+                const correctedLine = lines[i + 1] ? lines[i + 1].trim() : null;
+                if (originalLine && correctedLine && originalLine.startsWith('- 原始字幕內容：') && correctedLine.startsWith('- 建議修正內容：')) {
+                    const original = originalLine.substring('- 原始字幕內容：'.length).trim();
+                    let corrected = correctedLine.substring('- 建議修正內容：'.length).trim();
+
+                const originals = original.split(',').map(o => o.trim()).filter(o=> o !== "");
+                    originals.forEach(original=>{
+                        if (corrected === "(保留原樣)") {
+                        corrections[original] = { replacement: null, removeBrackets: false };
+                        }
+                    else if (corrected.includes("(保留原樣)") && shouldRemoveBrackets) {
+                            const newCorrected = corrected.replace(/（[^）]*）/g, '').replace(/\([^\)]*\)/g, '').replace('(保留原樣)','').trim();
+                            corrections[original] = { replacement: newCorrected, removeBrackets: true};
+                        }
+                        else {
+                        if(shouldRemoveBrackets){
+                            corrected = corrected.replace(/（[^）]*）/g, '').replace(/\([^\)]*\)/g, '').trim();
+                        }
+                        corrections[original] = { replacement: corrected, removeBrackets: false};
+                        }
+                    });
+                
+                }
+            }
+            return corrections;
+        }
+
+          // 應用修正規則
+          function applyCorrections(subtitle, correctionMap) {
+            const lines = subtitle.split('\n');
+            let outputLog = '';
+            let correctedSubtitle = "";
+            let lineCount = 1;
+            let correctionCount = 0;
+    
+            for (const line of lines) {
+                let correctedLine = line;
+                for (const original in correctionMap) {
+                    if (correctedLine.includes(original)) {
+                        const replacement = correctionMap[original].replacement;
+                    if(replacement === null){
+                        outputLog += `修正字幕行(${lineCount}): ${line} -> ${line}\n`;
+                        }
+                    else{
+                        const hasRemoveBrackets = correctionMap[original].removeBrackets;
+                        const newCorrectedLine = hasRemoveBrackets ? correctedLine.replace(original, replacement) : correctedLine.replace(original, replacement);
+                        correctedLine = newCorrectedLine;
+                        outputLog += `修正字幕行(${lineCount}): ${line} -> ${correctedLine}\n`;
+                        }
+                    correctionCount++;
+                    }
+                }
+                correctedSubtitle += correctedLine + '\n';
+                lineCount++;
+            }
+            return {outputLog, correctedSubtitle, correctionCount};
+        }
+
+          downloadButton.addEventListener('click', () => {
+              if(!correctedSubtitle){
+                  alert("請先修正字幕");
+                  return;
+              }
+              const blob = new Blob([correctedSubtitle], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'corrected_subtitle.txt';
+              a.click();
+              URL.revokeObjectURL(url);
+          });
+      });
+  </script>
+</body>
+</html>
