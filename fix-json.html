@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON 修正工具</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+        textarea {
+            width: 80%;
+            height: 200px;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+            resize: vertical; /* 允許垂直調整大小 */
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+      <h1>JSON 修正工具</h1>
+
+      <label for="inputText">請貼上錯誤的 JSON：</label>
+      <textarea id="inputText" placeholder="貼上您的 JSON..."></textarea>
+
+      <button onclick="fixJson()">修正 JSON</button>
+
+      <label for="outputText">修正後的 JSON：</label>
+      <textarea id="outputText" readonly></textarea>
+
+      <button onclick="copyOutput()">複製修正結果</button>
+
+      <div id="message" style="color: green; margin-top: 10px;"></div>
+    </div>
+
+    <script>
+        function fixJson() {
+            const inputText = document.getElementById('inputText').value;
+            let fixedJson;
+
+            try {
+                // 嘗試直接解析，看是否已經是有效的 JSON
+                fixedJson = JSON.parse(inputText);
+
+            } catch (error) {
+                // 如果解析錯誤，嘗試進行修正
+                try{
+                    // 這裡使用eval() 是一個快速的修正方法，<strong>但有安全風險</strong>
+                    // 在生產環境中，應使用更安全的方法，例如：
+                    // 1. 使用正規表達式逐步修復
+                    // 2. 使用專門的 JSON 修復庫
+                   fixedJson = eval('(' + inputText + ')');
+                } catch (e2){
+                   alert("輸入的內容無法解析為JSON，請確認格式是否正確。細部錯誤" + e2)
+                   return;
+                }
+
+            }
+            document.getElementById('outputText').value = JSON.stringify(fixedJson, null, 2); // 美化輸出
+            document.getElementById('message').innerText = 'JSON 已修正!';
+        }
+
+        function copyOutput() {
+            const outputText = document.getElementById('outputText');
+            outputText.select();
+            document.execCommand('copy');
+            document.getElementById('message').innerText = '已複製到剪貼簿！';
+        }
+    </script>
+</body>
+</html>
