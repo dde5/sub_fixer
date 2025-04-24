@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文字時間調整工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for better appearance */
+        textarea {
+            min-height: 300px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold mb-6 text-center text-gray-800">文字時間調整工具</h1>
+
+        <div class="mb-4">
+            <label for="inputText" class="block text-gray-700 text-sm font-bold mb-2">
+                輸入文字或上傳檔案:
+            </label>
+            <textarea id="inputText" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mb-2" placeholder="請在此貼上您的文字..."></textarea>
+            <input type="file" id="fileInput" accept=".txt" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+        </div>
+
+        <div class="mb-4">
+            <label for="speedMultiplier" class="block text-gray-700 text-sm font-bold mb-2">
+                時間調整倍數 (例如: 0.5 慢兩倍, 2 快兩倍):
+            </label>
+            <input type="number" id="speedMultiplier" value="1" step="0.1" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+
+        <div class="flex items-center justify-center mb-6">
+            <button id="adjustButton" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                調整時間
+            </button>
+        </div>
+
+        <div class="mb-4">
+            <label for="outputText" class="block text-gray-700 text-sm font-bold mb-2">
+                調整後的文字:
+            </label>
+            <textarea id="outputText" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline bg-gray-50"></textarea>
+        </div>
+
+        <div class="flex items-center justify-center space-x-4"> <button id="copyButton" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" disabled> 一鍵複製
+            </button>
+            <button id="downloadButton" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" disabled>
+                下載結果
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('inputText').value = e.target.result;
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        document.getElementById('adjustButton').addEventListener('click', function() {
+            const inputText = document.getElementById('inputText').value;
+            const speedMultiplier = parseFloat(document.getElementById('speedMultiplier').value);
+            const outputTextarea = document.getElementById('outputText');
+            const downloadButton = document.getElementById('downloadButton');
+            const copyButton = document.getElementById('copyButton'); // Get the new copy button
+
+            if (isNaN(speedMultiplier) || speedMultiplier <= 0) {
+                alert('請輸入有效的時間調整倍數 (大於 0)。');
+                return;
+            }
+
+            // Regex to find timestamps in HH:MM:SS format (and potentially H:M:S, MM:SS, M:S etc.)
+            // This regex looks for digits separated by colons, allowing for variable lengths.
+            // It's a bit more flexible than strictly HH:MM:SS.
+            const timeRegex = /(\d{1,2}:\d{2}:\d{2})|(\d{1,2}:\d{2})/g;
+
+            let adjustedText = inputText.replace(timeRegex, function(match) {
+                const parts = match.split(':').map(Number);
+                let totalSeconds = 0;
+
+                if (parts.length === 3) { // HH:MM:SS
+                    totalSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                } else if (parts.length === 2) { // MM:SS
+                     totalSeconds = parts[0] * 60 + parts[1];
+                }
+                // Add more cases if needed (e.g., H:M:S)
+
+                const adjustedSeconds = totalSeconds / speedMultiplier;
+
+                const hours = Math.floor(adjustedSeconds / 3600);
+                const minutes = Math.floor((adjustedSeconds % 3600) / 60);
+                const seconds = Math.floor(adjustedSeconds % 60);
+
+                // Format back to HH:MM:SS, padding with leading zeros
+                // Modified to always include the hours part
+                const formattedTime =
+                    String(hours).padStart(2, '0') + ':' +
+                    String(minutes).padStart(2, '0') + ':' +
+                    String(seconds).padStart(2, '0');
+
+                return formattedTime;
+            });
+
+            outputTextarea.value = adjustedText;
+            downloadButton.disabled = false;
+            copyButton.disabled = false; // Enable the copy button
+        });
+
+        document.getElementById('downloadButton').addEventListener('click', function() {
+            const outputText = document.getElementById('outputText').value;
+            const blob = new Blob([outputText], { type: 'text/plain' });
+            const anchor = document.createElement('a');
+            anchor.href = URL.createObjectURL(blob);
+            anchor.download = 'adjusted_text.txt';
+            anchor.click();
+            URL.revokeObjectURL(anchor.href); // Clean up
+        });
+
+        // New event listener for the copy button
+        document.getElementById('copyButton').addEventListener('click', function() {
+            const outputText = document.getElementById('outputText').value;
+            // Use the Clipboard API to copy text
+            navigator.clipboard.writeText(outputText).then(function() {
+                // Success feedback (optional, could be a temporary message)
+                alert('文字已複製到剪貼簿！');
+            }, function(err) {
+                // Error feedback
+                console.error('複製文字失敗: ', err);
+                alert('複製文字失敗，請手動複製。');
+            });
+        });
+
+    </script>
+</body>
+</html>
