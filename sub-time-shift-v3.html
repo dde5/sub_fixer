@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕時間同步工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .control-panel {
+            grid-column: span 2;
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        .time-input-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"], input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-top: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        .file-upload {
+            margin-bottom: 15px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .download-btn {
+            background-color: #2196F3;
+        }
+        .download-btn:hover {
+            background-color: #0b7dda;
+        }
+        .time-input {
+            font-family: monospace;
+        }
+        .example {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 3px;
+        }
+        .sync-btn {
+            background-color: #ff9800;
+        }
+        .sync-btn:hover {
+            background-color: #e68a00;
+        }
+        .info-panel {
+            background-color: #e7f3fe;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <h1>字幕時間同步工具</h1>
+    
+    <div class="control-panel">
+        <div class="time-input-group">
+            <div>
+                <div class="control-group">
+                    <label for="originalStart">原始字幕起始時間:</label>
+                    <input type="text" id="originalStart" class="time-input" value="00:00:00,000" 
+                           pattern="^\d{2}:\d{2}:\d{2},\d{3}$">
+                </div>
+                <div class="control-group">
+                    <label for="originalEnd">原始字幕結束時間:</label>
+                    <input type="text" id="originalEnd" class="time-input" value="00:00:00,000" 
+                           pattern="^\d{2}:\d{2}:\d{2},\d{3}$">
+                </div>
+            </div>
+            <div>
+                <div class="control-group">
+                    <label for="targetStart">對照字幕起始時間:</label>
+                    <input type="text" id="targetStart" class="time-input" value="00:00:00,000" 
+                           pattern="^\d{2}:\d{2}:\d{2},\d{3}$">
+                </div>
+                <div class="control-group">
+                    <label for="targetEnd">對照字幕結束時間:</label>
+                    <input type="text" id="targetEnd" class="time-input" value="00:00:00,000" 
+                           pattern="^\d{2}:\d{2}:\d{2},\d{3}$">
+                </div>
+            </div>
+        </div>
+        
+        <button onclick="calculateAndApplySync()" class="sync-btn">計算並同步時間</button>
+        
+        <div class="info-panel" id="syncInfo">
+            請先設定原始字幕和對照字幕的頭尾時間，然後點擊「計算並同步時間」按鈕。
+        </div>
+        
+        <div class="file-upload">
+            <label for="fileInput">上傳原始字幕檔案:</label>
+            <input type="file" id="fileInput" accept=".srt,.txt">
+        </div>
+        
+        <button class="download-btn" onclick="downloadFile()">下載同步後的字幕</button>
+    </div>
+    
+    <div class="container">
+        <div>
+            <label for="inputText">原始字幕內容:</label>
+            <textarea id="inputText" placeholder="請貼上原始字幕內容或上傳檔案"></textarea>
+        </div>
+        <div>
+            <label for="outputText">同步後字幕內容:</label>
+            <textarea id="outputText" placeholder="同步後的內容將顯示在這裡"></textarea>
+        </div>
+    </div>
+
+    <script>
+        // 載入檔案
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('inputText').value = e.target.result;
+            };
+            reader.readAsText(file);
+        });
+        
+        // 解析時間字串為毫秒
+        function parseTime(timeStr) {
+            const parts = timeStr.split(/[:,]/);
+            if (parts.length !== 4) return 0;
+            
+            const hh = parseInt(parts[0]) || 0;
+            const mm = parseInt(parts[1]) || 0;
+            const ss = parseInt(parts[2]) || 0;
+            const ms = parseInt(parts[3]) || 0;
+            
+            return (hh * 3600 + mm * 60 + ss) * 1000 + ms;
+        }
+        
+        // 格式化毫秒為時間字串（無條件捨去到毫秒）
+        function formatTime(ms) {
+            // 無條件捨去到整數毫秒
+            ms = Math.floor(ms);
+            
+            // 確保時間不小於0
+            ms = Math.max(0, ms);
+            
+            const hh = Math.floor(ms / 3600000);
+            ms %= 3600000;
+            const mm = Math.floor(ms / 60000);
+            ms %= 60000;
+            const ss = Math.floor(ms / 1000);
+            ms %= 1000;
+            
+            return `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+        }
+        
+        // 計算並應用時間同步
+        function calculateAndApplySync() {
+            // 獲取輸入的時間值
+            const originalStartStr = document.getElementById('originalStart').value.trim();
+            const originalEndStr = document.getElementById('originalEnd').value.trim();
+            const targetStartStr = document.getElementById('targetStart').value.trim();
+            const targetEndStr = document.getElementById('targetEnd').value.trim();
+            
+            // 驗證時間格式
+            const timePattern = /^\d{2}:\d{2}:\d{2},\d{3}$/;
+            if (!timePattern.test(originalStartStr) || !timePattern.test(originalEndStr) || 
+                !timePattern.test(targetStartStr) || !timePattern.test(targetEndStr)) {
+                alert('請輸入正確的時間格式 (00:00:00,000)');
+                return;
+            }
+            
+            // 轉換為毫秒
+            const originalStart = parseTime(originalStartStr);
+            const originalEnd = parseTime(originalEndStr);
+            const targetStart = parseTime(targetStartStr);
+            const targetEnd = parseTime(targetEndStr);
+            
+            // 計算時間差和比例
+            const originalDuration = originalEnd - originalStart;
+            const targetDuration = targetEnd - targetStart;
+            
+            if (originalDuration <= 0 || targetDuration <= 0) {
+                alert('原始字幕或對照字幕的持續時間必須大於0');
+                return;
+            }
+            
+            const timeOffset = targetStart - originalStart;
+            const speedFactor = originalDuration / targetDuration;
+            
+            // 顯示計算結果
+            document.getElementById('syncInfo').innerHTML = `
+                計算結果:<br>
+                - 時間偏移: ${formatTime(timeOffset)} (${timeOffset > 0 ? '增加' : '減少'} ${formatTime(Math.abs(timeOffset))})<br>
+                - 速率因子: ${speedFactor.toFixed(6)}<br>
+                - 原始持續時間: ${formatTime(originalDuration)}<br>
+                - 目標持續時間: ${formatTime(targetDuration)}
+            `;
+            
+            // 處理原始字幕
+            const inputText = document.getElementById('inputText').value;
+            if (!inputText) {
+                alert('請先輸入或上傳原始字幕內容');
+                return;
+            }
+            
+            const lines = inputText.split('\n');
+            let output = [];
+            let currentBlock = [];
+            let newIndex = 1;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                
+                if (line.match(/^\d+$/)) {
+                    // 這是索引行
+                    if (currentBlock.length > 0) {
+                        processBlock(currentBlock);
+                    }
+                    currentBlock = [line];
+                } else if (line.includes('-->')) {
+                    // 這是時間行
+                    currentBlock.push(line);
+                } else if (line) {
+                    // 這是文字行
+                    currentBlock.push(line);
+                }
+                
+                // 處理最後一個塊
+                if (i === lines.length - 1 && currentBlock.length > 0) {
+                    processBlock(currentBlock);
+                }
+            }
+            
+            function processBlock(block) {
+                if (block.length < 2) return;
+                
+                // 處理時間行
+                const timeLine = block[1];
+                if (!timeLine.includes('-->')) return;
+                
+                const times = timeLine.split('-->').map(t => t.trim());
+                let startMs = parseTime(times[0]);
+                let endMs = parseTime(times[1]);
+                
+                // 1. 應用時間偏移
+                startMs += timeOffset;
+                endMs += timeOffset;
+                
+                // 2. 應用速率調整
+                if (originalStart !== originalEnd) { // 避免除以0
+                    startMs = originalStart + (startMs - originalStart) / speedFactor;
+                    endMs = originalStart + (endMs - originalStart) / speedFactor;
+                }
+                
+                // 無條件捨去到毫秒
+                startMs = Math.floor(startMs);
+                endMs = Math.floor(endMs);
+                
+                // 確保時間不小於0
+                startMs = Math.max(0, startMs);
+                endMs = Math.max(0, endMs);
+                
+                // 如果開始和結束時間都為0，則跳過這個塊
+                if (startMs === 0 && endMs === 0) {
+                    return;
+                }
+                
+                // 重新編號
+                output.push(newIndex.toString());
+                newIndex++;
+                
+                // 加入調整後的時間行
+                output.push(`${formatTime(startMs)} --> ${formatTime(endMs)}`);
+                
+                // 加入文字行
+                for (let j = 2; j < block.length; j++) {
+                    if (block[j]) {
+                        output.push(block[j]);
+                    }
+                }
+                
+                // 塊之間的空行
+                output.push('');
+            }
+            
+            // 移除最後多餘的空行
+            if (output.length > 0 && output[output.length - 1] === '') {
+                output.pop();
+            }
+            
+            document.getElementById('outputText').value = output.join('\n');
+        }
+        
+        // 下載檔案
+        function downloadFile() {
+            const content = document.getElementById('outputText').value;
+            if (!content) {
+                alert('沒有內容可下載');
+                return;
+            }
+            
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'synced_subtitle.srt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

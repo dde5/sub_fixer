@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕時間調整器</title>
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            padding: 1rem;
+        }
+        label {
+            font-weight: 600;
+            color: #4b5563;
+        }
+        textarea {
+            font-family: 'Inter', monospace;
+            border-radius: 0.375rem;
+            border-width: 1px;
+            border-color: #d1d5db;
+            padding: 0.5rem;
+            width: 100%;
+            min-height: 160px;
+            resize: vertical;
+            margin-bottom: 1rem;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.03);
+            background-color: #f9fafb;
+            color: #374151;
+            line-height: 1.5;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+        input[type="text"] {
+            border-radius: 0.375rem;
+            border-width: 1px;
+            border-color: #d1d5db;
+            padding: 0.5rem;
+            width: 100%;
+            max-width: 200px;
+            margin-bottom: 1rem;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.03);
+            background-color: #f9fafb;
+            color: #374151;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        button {
+            border-radius: 0.375rem;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        button:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        button:active {
+            transform: translateY(0) scale(0.95);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+        }
+        .primary-button {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .primary-button:hover {
+            background-color: #2563eb;
+        }
+        .primary-button:active {
+            background-color: #1e40af;
+        }
+        .secondary-button {
+            background-color: #e5e7eb;
+            color: #374151;
+        }
+        .secondary-button:hover {
+            background-color: #d1d5db;
+        }
+         .secondary-button:active {
+            background-color: #b0b5ba;
+        }
+        #download-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .icon {
+            width: 1rem;
+            height: 1rem;
+            stroke-width: 2;
+            stroke: currentColor;
+            fill: none;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="container bg-white shadow-md rounded-lg p-8">
+        <h1 class="text-2xl font-semibold text-gray-800 mb-6 text-center">字幕時間調整器</h1>
+
+        <div class="mb-4">
+            <label for="start-time-input" class="block text-sm font-medium text-gray-700">起始時間 (HH:MM:SS,ms):</label>
+            <input type="text" id="start-time-input" placeholder="HH:MM:SS,ms">
+        </div>
+
+        <div class="mb-4">
+            <label for="end-time-input" class="block text-sm font-medium text-gray-700">原始結束時間 (HH:MM:SS,ms):</label>
+            <input type="text" id="end-time-input" placeholder="HH:MM:SS,ms">
+        </div>
+
+        <div class="mb-4">
+            <label for="new-end-time-input" class="block text-sm font-medium text-gray-700">修改後結束時間 (HH:MM:SS,ms):</label>
+            <input type="text" id="new-end-time-input" placeholder="HH:MM:SS,ms">
+        </div>
+
+        <div class="mb-4">
+            <label for="subtitle-input" class="block text-sm font-medium text-gray-700">原始字幕內容:</label>
+            <textarea id="subtitle-input" placeholder="請貼上或上傳您的字幕內容..."></textarea>
+            <input type="file" id="file-input" accept=".srt,.vtt,.ass,.txt" class="mt-2">
+        </div>
+
+        <div class="mb-4">
+            <label for="output-textarea" class="block text-sm font-medium text-gray-700">修改後的字幕內容:</label>
+            <textarea id="output-textarea" placeholder="修改後的字幕將顯示在這裡..."></textarea>
+        </div>
+
+        <div class="flex space-x-4 justify-center mt-6">
+            <button id="adjust-time-button" class="primary-button">調整時間</button>
+            <button id="download-button" class="secondary-button">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 0 0 4.561 21H19.439a2 2 0 0 0 1.94-1.515L22 17"/></svg>
+                下載檔案
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const startTimeInput = document.getElementById('start-time-input');
+        const endTimeInput = document.getElementById('end-time-input');
+        const newEndTimeInput = document.getElementById('new-end-time-input');
+        const subtitleInput = document.getElementById('subtitle-input');
+        const outputTextarea = document.getElementById('output-textarea');
+        const adjustTimeButton = document.getElementById('adjust-time-button');
+        const downloadButton = document.getElementById('download-button');
+        const fileInput = document.getElementById('file-input');
+
+        // 下載按鈕點擊事件
+        downloadButton.addEventListener('click', () => {
+            const text = outputTextarea.value;
+            if (text === "") {
+                alert("請先修改字幕內容再下載。");
+                return;
+            }
+            const filename = 'modified_subtitles.srt';
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        // 調整時間按鈕點擊事件
+        adjustTimeButton.addEventListener('click', () => {
+            const startTime = startTimeInput.value;
+            const endTime = endTimeInput.value;
+            const newEndTime = newEndTimeInput.value;
+            const subtitleText = subtitleInput.value;
+
+            if (!startTime || !endTime || !newEndTime || !subtitleText) {
+                alert("請輸入所有必要的時間和字幕內容。");
+                return;
+            }
+
+            const rate = calculateRate(startTime, endTime, newEndTime);
+            const lines = subtitleText.trim().split('\n');
+            let result = '';
+            let subtitleCount = 1;
+            let firstSubtitleNumber = parseInt(lines[0].trim()); // 嘗試解析第一行的數字
+
+            if (isNaN(firstSubtitleNumber)) {
+                firstSubtitleNumber = 1; // 如果解析失敗，則從 1 開始
+            }
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const timeMatch = line.match(/(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})/);
+                if (timeMatch) {
+                    const originalStartTime = timeMatch[1];
+                    const originalEndTime = timeMatch[2];
+
+                    const adjustedStartTime = adjustTime(originalStartTime, rate);
+                    const adjustedEndTime = adjustTime(originalEndTime, rate);
+
+                    result += `${subtitleCount}\n`;
+                    result += `${adjustedStartTime} --> ${adjustedEndTime}\n`;
+                    i++;
+                    if (i < lines.length) {
+                        result += `${lines[i]}\n`;
+                    }
+                    subtitleCount++;
+                } else {
+                    result += `${line}\n`;
+                }
+            }
+            outputTextarea.value = result.trim();
+        });
+
+        // 調整時間的函式
+        function adjustTime(timeString, rate) {
+            let [hh, mm, ss_ms] = timeString.split(':');
+            let [ss, ms] = ss_ms.split(',');
+            let totalMilliseconds = (parseInt(hh, 10) * 3600 + parseInt(mm, 10) * 60 + parseInt(ss, 10)) * 1000 + parseInt(ms, 10);
+
+            totalMilliseconds = Math.round(totalMilliseconds * rate);
+
+            if (totalMilliseconds < 0) {
+                totalMilliseconds = 0;
+            }
+
+            const newHours = Math.floor(totalMilliseconds / 3600000);
+            const remainingMilliseconds = totalMilliseconds % 3600000;
+            const newMinutes = Math.floor(remainingMilliseconds / 60000);
+            const newSeconds = Math.floor((remainingMilliseconds % 60000) / 1000);
+            const newMilliseconds = remainingMilliseconds % 1000;
+
+            const formattedHours = String(newHours).padStart(2, '0');
+            const formattedMinutes = String(newMinutes).padStart(2, '0');
+            const formattedSeconds = String(newSeconds).padStart(2, '0');
+            const formattedMilliseconds = String(newMilliseconds).padStart(3, '0');
+
+            return `${formattedHours}:${formattedMinutes}:${formattedSeconds},${formattedMilliseconds}`;
+        }
+
+        // 計算倍速的函式
+        function calculateRate(startTime, endTime, newEndTime) {
+            const startMs = timeToMilliseconds(startTime);
+            const endMs = timeToMilliseconds(endTime);
+            const newEndMs = timeToMilliseconds(newEndTime);
+            return newEndMs / endMs;
+        }
+
+        // 將時間字串轉換為毫秒的函式
+        function timeToMilliseconds(timeString) {
+            const [hh, mm, ss_ms] = timeString.split(':');
+            const [ss, ms] = ss_ms.split(',');
+            return (parseInt(hh, 10) * 3600 + parseInt(mm, 10) * 60 + parseInt(ss, 10)) * 1000 + parseInt(ms, 10);
+        }
+
+        // 監聽檔案輸入框的 change 事件
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    subtitleInput.value = e.target.result;
+                };
+                reader.readAsText(file);
+            }
+        });
+    </script>
+</body>
+</html>

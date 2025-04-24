@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕時間調整工具</title>
+    <style>
+        /* 保持原有樣式不變 */
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .control-panel {
+            grid-column: span 2;
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"], input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-top: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        textarea {
+            width: 100%;
+            height: 400px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        .file-upload {
+            margin-bottom: 15px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .download-btn {
+            background-color: #2196F3;
+        }
+        .download-btn:hover {
+            background-color: #0b7dda;
+        }
+        .time-input {
+            font-family: monospace;
+        }
+        .example {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 3px;
+        }
+        .apply-btn {
+            background-color: #ff9800;
+        }
+        .apply-btn:hover {
+            background-color: #e68a00;
+        }
+    </style>
+</head>
+<body>
+    <h1>字幕時間調整工具</h1>
+    
+    <div class="control-panel">
+        <div class="control-group">
+            <label for="timeAdjustment">時間調整 (格式: 00:00:00,000):</label>
+            <input type="text" id="timeAdjustment" class="time-input" value="00:00:00,000" 
+                   pattern="^-?\d{2}:\d{2}:\d{2},\d{3}$">
+            <div class="example">範例: -00:01:43,060 (減少1分43.06秒) 或 00:00:10,000 (增加10秒)</div>
+        </div>
+        
+        <div class="control-group">
+            <label for="speedFactor">速率調整 (倍數):</label>
+            <input type="number" id="speedFactor" value="1.0" step="0.1" min="0.1">
+            <button onclick="processSubtitle()" class="apply-btn">應用調整</button>
+        </div>
+        
+        <div class="file-upload">
+            <label for="fileInput">上傳字幕檔案:</label>
+            <input type="file" id="fileInput" accept=".srt,.txt">
+        </div>
+        
+        <button class="download-btn" onclick="downloadFile()">下載修改後的字幕</button>
+    </div>
+    
+    <div class="container">
+        <div>
+            <label for="inputText">原始字幕:</label>
+            <textarea id="inputText" placeholder="請貼上字幕內容或上傳檔案"></textarea>
+        </div>
+        <div>
+            <label for="outputText">修改後字幕:</label>
+            <textarea id="outputText" placeholder="修改後的內容將顯示在這裡"></textarea>
+        </div>
+    </div>
+
+    <script>
+        // 載入檔案
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('inputText').value = e.target.result;
+            };
+            reader.readAsText(file);
+        });
+        
+        // 解析時間字串為毫秒
+        function parseTime(timeStr) {
+            // 處理負號
+            let isNegative = false;
+            if (timeStr.startsWith('-')) {
+                isNegative = true;
+                timeStr = timeStr.substring(1);
+            }
+            
+            const parts = timeStr.split(/[:,]/);
+            if (parts.length !== 4) return 0;
+            
+            const hh = parseInt(parts[0]) || 0;
+            const mm = parseInt(parts[1]) || 0;
+            const ss = parseInt(parts[2]) || 0;
+            const ms = parseInt(parts[3]) || 0;
+            
+            let totalMs = (hh * 3600 + mm * 60 + ss) * 1000 + ms;
+            return isNegative ? -totalMs : totalMs;
+        }
+        
+        // 格式化毫秒為時間字串（四捨五入到毫秒）
+        function formatTime(ms) {
+            // 四捨五入到整數毫秒
+            ms = Math.round(ms);
+            
+            // 確保時間不小於0
+            ms = Math.max(0, ms);
+            
+            const hh = Math.floor(ms / 3600000);
+            ms %= 3600000;
+            const mm = Math.floor(ms / 60000);
+            ms %= 60000;
+            const ss = Math.floor(ms / 1000);
+            ms %= 1000;
+            
+            return `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+        }
+        
+        // 處理字幕內容
+        function processSubtitle() {
+            // 獲取時間調整值
+            const adjustmentStr = document.getElementById('timeAdjustment').value.trim();
+            if (!adjustmentStr.match(/^-?\d{2}:\d{2}:\d{2},\d{3}$/)) {
+                alert('請輸入正確的時間格式 (00:00:00,000)');
+                return;
+            }
+            const adjustment = parseTime(adjustmentStr);
+            
+            // 獲取速率調整值
+            const factor = parseFloat(document.getElementById('speedFactor').value);
+            if (isNaN(factor) || factor <= 0) {
+                alert('請輸入有效的倍數 (大於0的數字)');
+                return;
+            }
+            
+            const inputText = document.getElementById('inputText').value;
+            if (!inputText) {
+                alert('請先輸入或上傳字幕內容');
+                return;
+            }
+            
+            const lines = inputText.split('\n');
+            let output = [];
+            let currentBlock = [];
+            let newIndex = 1;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                
+                if (line.match(/^\d+$/)) {
+                    // 這是索引行
+                    if (currentBlock.length > 0) {
+                        processBlock(currentBlock);
+                    }
+                    currentBlock = [line];
+                } else if (line.includes('-->')) {
+                    // 這是時間行
+                    currentBlock.push(line);
+                } else if (line) {
+                    // 這是文字行
+                    currentBlock.push(line);
+                }
+                
+                // 處理最後一個塊
+                if (i === lines.length - 1 && currentBlock.length > 0) {
+                    processBlock(currentBlock);
+                }
+            }
+            
+            function processBlock(block) {
+                if (block.length < 2) return;
+                
+                // 處理時間行
+                const timeLine = block[1];
+                if (!timeLine.includes('-->')) return;
+                
+                const times = timeLine.split('-->').map(t => t.trim());
+                let startMs = parseTime(times[0]);
+                let endMs = parseTime(times[1]);
+                
+                // 1. 先應用時間調整
+                startMs += adjustment;
+                endMs += adjustment;
+                
+                // 2. 再應用速率調整
+                startMs = Math.round(startMs / factor);
+                endMs = Math.round(endMs / factor);
+                
+                // 確保時間不小於0
+                startMs = Math.max(0, startMs);
+                endMs = Math.max(0, endMs);
+                
+                // 如果開始和結束時間都為0，則跳過這個塊
+                if (startMs === 0 && endMs === 0) {
+                    return;
+                }
+                
+                // 重新編號
+                output.push(newIndex.toString());
+                newIndex++;
+                
+                // 加入調整後的時間行
+                output.push(`${formatTime(startMs)} --> ${formatTime(endMs)}`);
+                
+                // 加入文字行
+                for (let j = 2; j < block.length; j++) {
+                    if (block[j]) {
+                        output.push(block[j]);
+                    }
+                }
+                
+                // 塊之間的空行
+                output.push('');
+            }
+            
+            // 移除最後多餘的空行
+            if (output.length > 0 && output[output.length - 1] === '') {
+                output.pop();
+            }
+            
+            document.getElementById('outputText').value = output.join('\n');
+        }
+        
+        // 下載檔案
+        function downloadFile() {
+            const content = document.getElementById('outputText').value;
+            if (!content) {
+                alert('沒有內容可下載');
+                return;
+            }
+            
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'modified_subtitle.srt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
