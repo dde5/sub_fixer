@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>MD轉Word格式生成器</title>
+    <style>
+        :root {
+            --h1-font: 仿宋_GB2312;
+            --h1-size: 16pt;
+            --h1-line: 33pt;
+            --h2-font: 黑體;
+            --h2-size: 16pt;
+            --h2-line: 30pt;
+            --p-indent: 2em;
+            --p-line: 32pt;
+        }
+        body {
+            margin: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            height: 80vh;
+        }
+        textarea {
+            width: 100%;
+            height: 100%;
+            padding: 10px;
+            border: 2px solid #ccc;
+            resize: none;
+        }
+        #preview {
+            border: 2px solid #ccc;
+            padding: 20px;
+            overflow-y: auto;
+            background: white;
+        }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .style-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        select, input[type="number"] {
+            padding: 5px;
+            border: 1px solid #ddd;
+        }
+        button {
+            padding: 8px 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <input type="file" id="fileInput" accept=".md">
+        <button onclick="copyFormatted()">複製格式化內容</button>
+        <div class="style-control">
+            <label>標題字體：</label>
+            <select id="h1Font" onchange="updateStyle()">
+                <option value="仿宋_GB2312">仿宋</option>
+                <option value="黑體">黑體</option>
+                <option value="楷體">楷體</option>
+            </select>
+        </div>
+        <div class="style-control">
+            <label>正文字體：</label>
+            <select id="pFont" onchange="updateStyle()">
+                <option value="仿宋_GB2312">仿宋</option>
+                <option value="DFKai-SB">標楷體</option>
+            </select>
+        </div>
+        <div class="style-control">
+            <label>首行縮進：</label>
+            <input type="number" id="pIndent" value="2" min="0" max="4" onchange="updateStyle()">字
+        </div>
+    </div>
+
+    <div class="container">
+        <textarea id="input" placeholder="貼上Markdown內容..."></textarea>
+        <div id="preview"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script>
+        // 初始化樣式變數
+        let currentStyles = {
+            h1: { font: '仿宋_GB2312', size: '16pt', line: '33pt' },
+            h2: { font: '黑體', size: '16pt', line: '30pt' },
+            p: { font: '仿宋_GB2312', indent: '2em', line: '32pt' }
+        };
+
+        // 自訂渲染規則
+        const renderer = {
+            heading(text, level) {
+                const tag = `h${level}`;
+                return `<${tag} style="font-family:${currentStyles[tag].font};
+                    font-size:${currentStyles[tag].size};
+                    line-height:${currentStyles[tag].line}">${text}</${tag}>`;
+            },
+            paragraph(text) {
+                return `<p style="text-indent:${currentStyles.p.indent};
+                    line-height:${currentStyles.p.line};
+                    font-family:${currentStyles.p.font}">${text}</p>`;
+            }
+        };
+        marked.use({ renderer });
+
+        // 即時更新預覽
+        function updatePreview() {
+            const md = document.getElementById('input').value;
+            document.getElementById('preview').innerHTML = marked.parse(md);
+        }
+
+        // 樣式調整
+        function updateStyle() {
+            currentStyles.h1.font = document.getElementById('h1Font').value;
+            currentStyles.p.font = document.getElementById('pFont').value;
+            currentStyles.p.indent = document.getElementById('pIndent').value + 'em';
+            updatePreview();
+        }
+
+        // 檔案上傳
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('input').value = e.target.result;
+                updatePreview();
+            };
+            reader.readAsText(e.target.files[0]);
+        });
+
+        // 富文本複製功能
+        function copyFormatted() {
+            const range = document.createRange();
+            const selection = window.getSelection();
+            range.selectNodeContents(document.getElementById('preview'));
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            try {
+                document.execCommand('copy');
+                alert('格式化內容已複製到剪貼簿');
+            } catch(err) {
+                console.error('複製失敗:', err);
+            }
+            selection.removeAllRanges();
+        }
+
+        // 初始化輸入監聽
+        document.getElementById('input').addEventListener('input', updatePreview);
+    </script>
+</body>
+</html>

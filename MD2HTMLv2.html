@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>進階MD轉Word生成器</title>
+<style>
+:root {
+    --h1-font: '仿宋_GB2312';
+    --h2-font: '黑體';
+    --p-font: '仿宋_GB2312';
+    --p-indent: 2em;
+    --p-line: 32pt;
+}
+
+/* 原有樣式保留，新增以下樣式 */
+.font-loader {
+    position: absolute;
+    visibility: hidden;
+    height: 0;
+}
+</style>
+</head>
+<body>
+<div class="toolbar">
+    <input type="file" id="fileInput" accept=".md">
+    <button onclick="copyFormatted()">複製格式化內容</button>
+    <div class="style-control">
+        <label>標題字體：</label>
+        <select id="h1Font" onchange="updateStyle()"></select>
+    </div>
+    <div class="style-control">
+        <label>正文字體：</label>
+        <select id="pFont" onchange="updateStyle()"></select>
+    </div>
+</div>
+
+<div class="container">
+    <textarea id="input"></textarea>
+    <div id="preview"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+<script>
+// 系統字體檢測
+const systemFonts = ['仿宋_GB2312', '黑體', '楷體', 'DFKai-SB', 'Microsoft JhengHei', 'SimSun', 'Arial'];
+const fontCheckList = ['仿宋_GB2312', '黑體', 'DFKai-SB', '標楷體', 'Microsoft YaHei'];
+
+function populateFontSelector() {
+    const detectFont = (font) => new Promise(resolve => {
+        const dummy = document.createElement('span');
+        dummy.style.fontFamily = 'monospace';
+        dummy.style.fontFamily = `'${font}'`;
+        dummy.style.position = 'absolute';
+        document.body.appendChild(dummy);
+        
+        setTimeout(() => {
+            const originalWidth = dummy.offsetWidth;
+            dummy.style.fontFamily = `'${font}', monospace`;
+            setTimeout(() => {
+                resolve(originalWidth !== dummy.offsetWidth);
+                document.body.removeChild(dummy);
+            }, 100);
+        }, 100);
+    });
+
+    fontCheckList.forEach(async font => {
+        const isAvailable = await detectFont(font);
+        if (isAvailable) {
+            const option = document.createElement('option');
+            option.value = font;
+            option.textContent = font;
+            h1Font.appendChild(option.cloneNode(true));
+            pFont.appendChild(option);
+        }
+    });
+}
+
+// 圖片處理模組
+async function processImages(md) {
+    const imgRegex = /!\[.*?\]\((.*?)\)/g;
+    const matches = [...md.matchAll(imgRegex)];
+    
+    for (const match of matches) {
+        const imgUrl = match[1];
+        try {
+            const response = await fetch(imgUrl);
+            const blob = await response.blob();
+            const base64 = await new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+            });
+            md = md.replace(imgUrl, base64);
+        } catch (e) {
+            console.error('圖片轉換失敗:', e);
+        }
+    }
+    return md;
+}
+
+// 修改marked渲染器
+const renderer = {
+    image(href, title, text) {
+        return `<img src="${href}" alt="${text}" style="max-width:100%;height:auto">`;
+    },
+    // 保留其他渲染規則
+};
+
+// 整合處理流程
+async function updatePreview() {
+    let md = document.getElementById('input').value;
+    md = await processImages(md);
+    document.getElementById('preview').innerHTML = marked.parse(md);
+}
+
+// 初始化
+window.onload = () => {
+    populateFontSelector();
+    document.getElementById('input').addEventListener('input', updatePreview);
+    // 保留其他事件監聽
+};
+
+// 強化複製功能
+async function copyFormatted() {
+    const preview = document.getElementById('preview').cloneNode(true);
+    preview.querySelectorAll('img').forEach(img => {
+        img.style.width = '100%';
+        img.style.height = 'auto';
+    });
+
+    const tempDiv = document.createElement('div');
+    tempDiv.appendChild(preview);
+    document.body.appendChild(tempDiv);
+
+    const range = document.createRange();
+    range.selectNode(tempDiv);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    try {
+        document.execCommand('copy');
+        alert('格式化內容已複製');
+    } catch (err) {
+        console.error('複製失敗:', err);
+    }
+    
+    document.body.removeChild(tempDiv);
+}
+</script>
+</body>
+</html>
