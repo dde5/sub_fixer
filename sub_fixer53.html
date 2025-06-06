@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕全能工具</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #95a5a6;
+            --bg-color: #f4f4f4;
+            --container-bg: #fff;
+            --border-color: #ddd;
+            --text-color: #333;
+            --info-bg-1: #e8f4f8; /* For original subtitle group */
+            --info-bg-2: #fef5e7; /* For target video group */
+        }
+        html { scroll-behavior: smooth; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: var(--bg-color); color: var(--text-color); display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; }
+        .container { width: 90%; max-width: 900px; background-color: var(--container-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
+        h1 { text-align: center; margin-bottom: 10px; color: var(--primary-color); }
+        h2 { text-align: center; color: var(--primary-color); border-top: 2px solid #e0e0e0; padding-top: 20px; margin-top: 40px; }
+        .main-nav { text-align: center; background-color: var(--container-bg); padding: 10px 0; margin-bottom: 20px; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border-color); }
+        .main-nav a { text-decoration: none; color: var(--primary-color); padding: 10px 15px; margin: 0 5px; border-radius: 4px; transition: background-color 0.3s; }
+        .main-nav a:hover { background-color: #f1f1f1; }
+        .input-section, .output-section { margin-bottom: 20px; }
+        .subtitle-input-group { position: relative; }
+        .subtitle-button-overlay { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
+        textarea { width: 100%; min-height: 150px; padding: 10px; padding-top: 45px; margin: 10px 0; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; resize: vertical; }
+        input[type="file"] { margin-bottom: 10px; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; }
+        button { background-color: var(--primary-color); color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s ease; font-size: 14px; }
+        button:hover { background-color: #2980b9; }
+        button.secondary { background-color: var(--secondary-color); }
+        button.secondary:hover { background-color: #7f8c8d; }
+        button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        .button-group { display: flex; flex-wrap: wrap; align-items: center; margin-bottom: 10px; gap: 10px; }
+        .checkbox-group { display: flex; align-items: center; margin-left: auto; }
+        .checkbox-group input[type="checkbox"] { margin-right: 5px; }
+        .tab-container { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; }
+        .tab { padding: 10px 20px; cursor: pointer; background-color: #f1f1f1; border: 1px solid var(--border-color); border-bottom: none; margin-bottom: -2px; border-radius: 4px 4px 0 0; }
+        .tab.active { background-color: var(--container-bg); border-bottom: 2px solid var(--container-bg); }
+        .tab-content { display: none; padding: 10px; border: 1px solid var(--border-color); border-top: none; border-radius: 0 0 4px 4px; }
+        .tab-content.active { display: block; }
+        .grid-2-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .control-group { margin-bottom: 15px; padding: 10px; border-radius: 4px; }
+        .control-group.original { background-color: var(--info-bg-1); }
+        .control-group.target { background-color: var(--info-bg-2); }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .info-panel { background-color: #e7f3fe; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 0.9em; line-height: 1.5; }
+        .time-input { font-family: monospace; }
+        .example { font-size: 0.8em; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>字幕全能工具</h1>
+        
+        <nav class="main-nav">
+            <a href="#fixer-section">字幕修正</a>
+            <a href="#timeline-section">時間軸調整</a>
+            <a href="https://colab.research.google.com/drive/1RzNeqAA5duszSyVWL3a65eHInfwyusci#scrollTo=-U10L-FaUDPA" target="_blank" rel="noopener noreferrer">Whisper@Colab</a>
+        </nav>
+        
+        <div id="fixer-section">
+            <h2>字幕修正工具</h2>
+            <div class="input-section">
+                <p>請上傳字幕檔或直接貼上內容 (支援SRT與VTT-like格式)</p>
+                <input type="file" id="subtitleFile" accept=".txt,.srt,.vtt"><br>
+                <div class="subtitle-input-group">
+                    <textarea id="subtitleText" placeholder="在此貼上字幕內容..."></textarea>
+                    <div class="subtitle-button-overlay">
+                        <button id="convertSubtitleFormatButton" class="secondary" style="display: none;">轉換格式</button>
+                        <button id="downloadConvertedButton" class="secondary" style="display: none;">下載轉換結果</button>
+                    </div>
+                </div>
+            </div>
+            <div class="input-section">
+                <p>請上傳修正檔或直接貼上內容 (支援新舊格式)</p>
+                <input type="file" id="correctionFile" accept=".txt"><br>
+                <textarea id="correctionText" placeholder="貼上修正檔內容..."></textarea>
+            </div>
+            <div class="button-group">
+              <button id="fixButton">修正字幕</button>
+              <button id="convertCorrectionFormatButton" class="secondary">將修正檔轉為新格式</button>
+              <div class="checkbox-group">
+                <input type="checkbox" id="removeBrackets">
+                <label for="removeBrackets">去除修正檔括號內容</label>
+              </div>
+            </div>
+            <div class="output-section">
+                <p>修正後的字幕將顯示在這裡...</p>
+                <textarea id="outputText" readonly></textarea>
+                <button id="downloadButton">下載修正後字幕</button>
+            </div>
+        </div>
+        
+        <div id="timeline-section">
+            <h2>字幕時間軸工具</h2>
+            <div class="tab-container">
+                <div class="tab active" onclick="openTab(event, 'directAdjust')">直接調整</div>
+                <div class="tab" onclick="openTab(event, 'anchorSync')">錨點同步</div>
+                <div class="tab" onclick="openTab(event, 'subtitleCut')">字幕切割</div>
+            </div>
+
+            <div id="directAdjust" class="tab-content active">
+                <div class="grid-2-col">
+                    <div class="control-group">
+                        <label for="timeShift">時間偏移 (格式: +/-HH:MM:SS,ms)</label>
+                        <input type="text" id="timeShift" class="time-input" value="00:00:00,000" pattern="^-?\d{2}:\d{2}:\d{2},\d{3}$">
+                        <div class="example">範例: -00:01:43,060 (提早) 或 00:00:10,000 (延後)</div>
+                    </div>
+                    <div class="control-group">
+                        <label for="speedFactorDirect">速率因子</label>
+                        <input type="number" id="speedFactorDirect" value="1.0" step="0.01" min="0.1">
+                        <div class="example">範例: 1.1 (加速10%) 或 0.9 (減速10%)</div>
+                    </div>
+                </div>
+                <button id="applyDirectAdjust">應用調整到上方字幕</button>
+            </div>
+
+            <div id="anchorSync" class="tab-content">
+                <div class="grid-2-col">
+                    <div class="control-group original">
+                        <label for="originalStart">原始字幕起始時間 (自動偵測):</label>
+                        <input type="text" id="originalStart" class="time-input" value="00:00:00,000" pattern="^\d{2}:\d{2}:\d{2},\d{3}$">
+                        <label for="originalEnd" style="margin-top:10px;">原始字幕結束時間 (自動偵測):</label>
+                        <input type="text" id="originalEnd" class="time-input" value="00:00:00,000" pattern="^\d{2}:\d{2}:\d{2},\d{3}$">
+                    </div>
+                    <div class="control-group target">
+                        <label for="targetStart">對照影片起始時間:</label>
+                        <input type="text" id="targetStart" class="time-input" value="00:00:00,000" pattern="^\d{2}:\d{2}:\d{2},\d{3}$">
+                        <label for="targetEnd" style="margin-top:10px;">對照影片結束時間:</label>
+                        <input type="text" id="targetEnd" class="time-input" value="00:00:00,000" pattern="^\d{2}:\d{2}:\d{2},\d{3}$">
+                    </div>
+                </div>
+                <button id="calculateSync">計算同步參數</button>
+                <div class="info-panel" id="syncInfo">請設定四個時間錨點後點擊計算。</div>
+                <button id="applyAnchorSync" style="margin-top: 10px;" disabled>應用同步到上方字幕</button>
+            </div>
+
+            <div id="subtitleCut" class="tab-content">
+                 <div class="grid-2-col">
+                    <div class="control-group original">
+                        <label for="cutStart">切割起始時間 (此時間點將變為 00:00:00,000)</label>
+                        <input type="text" id="cutStart" class="time-input" value="00:00:00,000" pattern="^\d{2}:\d{2}:\d{2},\d{3}$">
+                    </div>
+                    <div class="control-group target">
+                        <label for="cutEnd">切割結束時間 (自動偵測)</label>
+                        <input type="text" id="cutEnd" class="time-input" value="00:00:00,000" pattern="^\d{2}:\d{2}:\d{2},\d{3}$">
+                    </div>
+                </div>
+                <button id="applyCut">應用切割與重置時間軸</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const subtitleFile = document.getElementById('subtitleFile');
+        const subtitleText = document.getElementById('subtitleText');
+        const correctionFile = document.getElementById('correctionFile');
+        const correctionText = document.getElementById('correctionText');
+        const fixButton = document.getElementById('fixButton');
+        const convertCorrectionFormatButton = document.getElementById('convertCorrectionFormatButton');
+        const outputText = document.getElementById('outputText');
+        const removeBrackets = document.getElementById('removeBrackets');
+        const downloadButton = document.getElementById('downloadButton');
+        const convertSubtitleFormatButton = document.getElementById('convertSubtitleFormatButton');
+        const downloadConvertedButton = document.getElementById('downloadConvertedButton');
+        const timeShiftInput = document.getElementById('timeShift');
+        const speedFactorDirectInput = document.getElementById('speedFactorDirect');
+        const applyDirectAdjustBtn = document.getElementById('applyDirectAdjust');
+        const originalStartInput = document.getElementById('originalStart');
+        const originalEndInput = document.getElementById('originalEnd');
+        const targetStartInput = document.getElementById('targetStart');
+        const targetEndInput = document.getElementById('targetEnd');
+        const calculateSyncBtn = document.getElementById('calculateSync');
+        const syncInfoPanel = document.getElementById('syncInfo');
+        const applyAnchorSyncBtn = document.getElementById('applyAnchorSync');
+        const cutStartInput = document.getElementById('cutStart');
+        const cutEndInput = document.getElementById('cutEnd');
+        const applyCutBtn = document.getElementById('applyCut');
+        
+        let lastCalculatedParams = null;
+      
+        function readFile(file, textarea, callback) { if (file) { const reader = new FileReader(); reader.onload = (e) => { textarea.value = e.target.result; if(callback) callback(); }; reader.readAsText(file, 'UTF-8'); } }
+        function downloadFile(content, fileName, contentType) { const blob = new Blob([content], { type: contentType }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }
+        function escapeRegExp(string) { return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+        
+        function timeToMs(timeStr) {
+            let isNegative = false;
+            if (timeStr.startsWith('-')) { isNegative = true; timeStr = timeStr.substring(1); }
+            const parts = timeStr.split(/[:,]/);
+            if (parts.length !== 4) return 0;
+            const [hh, mm, ss, ms] = parts.map(Number);
+            const totalMs = (hh * 3600 + mm * 60 + ss) * 1000 + ms;
+            return isNegative ? -totalMs : totalMs;
+        }
+
+        function msToTime(ms, showSign = false) {
+            const sign = ms < 0 ? '-' : (showSign ? '+' : '');
+            ms = Math.abs(Math.round(ms));
+            const hh = Math.floor(ms / 3600000); ms %= 3600000;
+            const mm = Math.floor(ms / 60000); ms %= 60000;
+            const ss = Math.floor(ms / 1000); ms %= 1000;
+            const pad = (num, len) => String(num).padStart(len, '0');
+            return `${sign}${pad(hh, 2)}:${pad(mm, 2)}:${pad(ss, 2)},${pad(ms, 3)}`;
+        }
+        
+        function scrollToElement(element) {
+             element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+             element.focus({preventScroll:true});
+        }
+        
+        // --- NEW --- Central function to handle all text changes in the main subtitle box
+        function handleSubtitleTextChange() {
+            toggleSubtitleButtons();
+            autoPopulateTimelineFields();
+        }
+        
+        // --- NEW --- Auto-populates timeline fields based on the main subtitle content
+        function autoPopulateTimelineFields() {
+            const text = subtitleText.value;
+            const parsedData = parseSubtitle(text);
+
+            if (parsedData.length > 0) {
+                const firstItem = parsedData[0];
+                const lastItem = parsedData[parsedData.length - 1];
+
+                const firstStartTimeSrt = (firstItem.originalFormat === 'formatSrt') 
+                                        ? firstItem.start 
+                                        : vttLikeTimeToSrt(firstItem.start);
+                const lastEndTimeSrt = (lastItem.originalFormat === 'formatSrt') 
+                                     ? lastItem.end 
+                                     : vttLikeTimeToSrt(lastItem.end);
+                
+                originalStartInput.value = firstStartTimeSrt;
+                originalEndInput.value = lastEndTimeSrt;
+                cutEndInput.value = lastEndTimeSrt;
+            } else {
+                // Reset fields if no valid subtitles are found
+                const defaultTime = '00:00:00,000';
+                originalStartInput.value = defaultTime;
+                originalEndInput.value = defaultTime;
+                cutEndInput.value = defaultTime;
+            }
+            cutStartInput.value = '00:00:00,000'; // Always reset cut start
+        }
+
+        subtitleFile.addEventListener('change', () => readFile(subtitleFile.files[0], subtitleText, handleSubtitleTextChange));
+        subtitleText.addEventListener('input', handleSubtitleTextChange);
+        
+        function toggleSubtitleButtons() { const hasText = subtitleText.value.trim().length > 0; convertSubtitleFormatButton.style.display = hasText ? 'inline-block' : 'none'; downloadConvertedButton.style.display = 'none'; }
+
+        window.openTab = function(evt, tabName) {
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            evt.currentTarget.classList.add('active');
+        }
+
+        function adjustSubtitleTime(parsedData, timeShiftMs, speedFactor) {
+            if (isNaN(timeShiftMs) || isNaN(speedFactor) || speedFactor <= 0) { alert("時間偏移或速率因子無效。"); return null; }
+            const adjustedData = JSON.parse(JSON.stringify(parsedData));
+            const timeParser = (ts, format) => (format === 'formatSrt' ? timeToMs(ts) : timeToMs(vttLikeTimeToSrt(ts)));
+            adjustedData.forEach(item => {
+                let startMs = timeParser(item.start, item.originalFormat);
+                let endMs = timeParser(item.end, item.originalFormat);
+                startMs = (startMs / speedFactor) + timeShiftMs;
+                endMs = (endMs / speedFactor) + timeShiftMs;
+                let newStartStr = msToTime(startMs);
+                let newEndStr = msToTime(endMs);
+                if(item.originalFormat === 'formatVttLike') { newStartStr = srtTimeToVttLike(newStartStr); newEndStr = srtTimeToVttLike(newEndStr); }
+                item.start = newStartStr;
+                item.end = newEndStr;
+            });
+            return adjustedData;
+        }
+
+        applyDirectAdjustBtn.addEventListener('click', () => {
+            const originalSub = subtitleText.value;
+            if (!originalSub.trim()) { alert("請先在上方貼上字幕內容。"); return; }
+            const parsedData = parseSubtitle(originalSub);
+            if (parsedData.length === 0) { alert("無法解析上方字幕內容。"); return; }
+            const timeShiftMs = timeToMs(timeShiftInput.value);
+            const speedFactor = parseFloat(speedFactorDirectInput.value);
+            const adjustedData = adjustSubtitleTime(parsedData, timeShiftMs, speedFactor);
+            if(adjustedData) {
+                subtitleText.value = rebuildSubtitle(adjustedData);
+                handleSubtitleTextChange(); // --- UPDATE ---
+                alert("時間軸調整已應用到上方字幕框。");
+                scrollToElement(subtitleText);
+            }
+        });
+
+        calculateSyncBtn.addEventListener('click', () => {
+            const timePattern = /^\d{2}:\d{2}:\d{2},\d{3}$/;
+            const inputs = [originalStartInput, originalEndInput, targetStartInput, targetEndInput];
+            if (inputs.some(input => !timePattern.test(input.value.trim()))) { alert('請輸入正確的時間格式 (HH:MM:SS,ms)'); return; }
+            const oStart = timeToMs(originalStartInput.value);
+            const oEnd = timeToMs(originalEndInput.value);
+            const tStart = timeToMs(targetStartInput.value);
+            const tEnd = timeToMs(targetEndInput.value);
+            const oDuration = oEnd - oStart;
+            const tDuration = tEnd - tStart;
+            if (oDuration <= 0 || tDuration <= 0) { alert('起始和結束時間必須形成一個正數時間段。'); return; }
+            const timeShift = tStart - (oStart * tDuration / oDuration);
+            const speedFactor = oDuration / tDuration;
+            lastCalculatedParams = { timeShift, speedFactor };
+            syncInfoPanel.innerHTML = `<b>計算結果:</b><br>- 時間偏移: ${msToTime(timeShift, true)}<br>- 原始持續時間: ${msToTime(oDuration)}<br>- 目標持續時間: ${msToTime(tDuration)}<br><div class="control-group" style="margin-top:10px;"><label for="speedFactorSync">速率因子 (可手動修改):</label><input type="number" id="speedFactorSync" value="${speedFactor.toFixed(6)}" step="0.000001"></div>`;
+            applyAnchorSyncBtn.disabled = false;
+        });
+
+        applyAnchorSyncBtn.addEventListener('click', () => {
+            const speedFactorSyncInput = document.getElementById('speedFactorSync');
+            if (!lastCalculatedParams || !speedFactorSyncInput) { alert("請先計算同步參數。"); return; }
+            const originalSub = subtitleText.value;
+            if (!originalSub.trim()) { alert("請先在上方貼上字幕內容。"); return; }
+            const parsedData = parseSubtitle(originalSub);
+            if (parsedData.length === 0) { alert("無法解析上方字幕內容。"); return; }
+            const finalSpeedFactor = parseFloat(speedFactorSyncInput.value);
+            const adjustedData = adjustSubtitleTime(parsedData, lastCalculatedParams.timeShift, finalSpeedFactor);
+            if(adjustedData) {
+                subtitleText.value = rebuildSubtitle(adjustedData);
+                handleSubtitleTextChange(); // --- UPDATE ---
+                alert("錨點同步已應用到上方字幕框。");
+                scrollToElement(subtitleText);
+            }
+        });
+        
+        applyCutBtn.addEventListener('click', () => {
+            const originalSub = subtitleText.value;
+            if (!originalSub.trim()) { alert("請先在上方貼上字幕內容。"); return; }
+            const parsedData = parseSubtitle(originalSub);
+            if (parsedData.length === 0) { alert("無法解析上方字幕內容。"); return; }
+            const timePattern = /^\d{2}:\d{2}:\d{2},\d{3}$/;
+            if (!timePattern.test(cutStartInput.value.trim()) || !timePattern.test(cutEndInput.value.trim())) { alert('請輸入正確的切割時間格式 (HH:MM:SS,ms)'); return; }
+            const cutStartMs = timeToMs(cutStartInput.value);
+            const cutEndMs = timeToMs(cutEndInput.value);
+            if (cutStartMs >= cutEndMs) { alert("切割起始時間必須早於結束時間。"); return; }
+            const timeParser = (ts, format) => (format === 'formatSrt' ? timeToMs(ts) : timeToMs(vttLikeTimeToSrt(ts)));
+            const timeOffset = -cutStartMs;
+            const filteredData = parsedData.filter(item => {
+                const startMs = timeParser(item.start, item.originalFormat);
+                const endMs = timeParser(item.end, item.originalFormat);
+                return endMs > cutStartMs && startMs < cutEndMs;
+            });
+            if (filteredData.length > 0) {
+                 const shiftedData = filteredData.map((item, index) => {
+                    const newItem = JSON.parse(JSON.stringify(item));
+                    let startMs = timeParser(newItem.start, newItem.originalFormat) + timeOffset;
+                    let endMs = timeParser(newItem.end, newItem.originalFormat) + timeOffset;
+                    startMs = Math.max(0, startMs); endMs = Math.max(0, endMs);
+                    let newStartStr = msToTime(startMs); let newEndStr = msToTime(endMs);
+                    if(newItem.originalFormat === 'formatVttLike') { newStartStr = srtTimeToVttLike(newStartStr); newEndStr = srtTimeToVttLike(newEndStr); }
+                    newItem.start = newStartStr; newItem.end = newEndStr; newItem.index = index + 1;
+                    return newItem;
+                });
+                 subtitleText.value = rebuildSubtitle(shiftedData);
+                 handleSubtitleTextChange(); // --- UPDATE ---
+                 alert(`字幕已切割並重置時間軸，保留了 ${shiftedData.length} 條字幕。`);
+                 scrollToElement(subtitleText);
+            } else { alert("在指定的時間範圍內未找到任何字幕。"); }
+        });
+        
+        // --- Full implementations of existing functions (no changes) ---
+        function srtTimeToVttLike(timeStr) { const [hms, ms] = timeStr.split(','); const [h, m, s] = hms.split(':').map(Number); const totalMinutes = h * 60 + m; return `${String(totalMinutes).padStart(2, '0')}:${String(s).padStart(2, '0')}.${ms}`; }
+        function vttLikeTimeToSrt(timeStr) { const [main, ms] = timeStr.replace(',', '.').split('.'); const parts = main.split(':').map(Number); let h = 0, m = 0, s = 0; if (parts.length === 3) { [h, m, s] = parts; } else if (parts.length === 2) { const totalMinutes = parts[0]; h = Math.floor(totalMinutes / 60); m = totalMinutes % 60; s = parts[1]; } const pad = (num) => String(num).padStart(2, '0'); return `${pad(h)}:${pad(m)}:${pad(s)},${ms.padEnd(3, '0')}`; }
+        convertSubtitleFormatButton.addEventListener('click', () => { const currentText = subtitleText.value; const format = detectSubtitleFormat(currentText); if (format === 'unknown') { alert('無法識別的字幕格式，無法轉換。'); return; } const parsedData = parseSubtitle(currentText); if (format === 'formatSrt') { parsedData.forEach(item => { item.start = srtTimeToVttLike(item.start); item.end = srtTimeToVttLike(item.end); item.targetFormat = 'formatVttLike'; }); } else { parsedData.forEach(item => { item.start = vttLikeTimeToSrt(item.start); item.end = vttLikeTimeToSrt(item.end); item.targetFormat = 'formatSrt'; }); } subtitleText.value = rebuildSubtitle(parsedData); downloadConvertedButton.style.display = 'inline-block'; handleSubtitleTextChange(); alert('格式轉換成功！'); });
+        downloadConvertedButton.addEventListener('click', () => { const format = detectSubtitleFormat(subtitleText.value); const extension = format === 'formatSrt' ? '.srt' : '.vtt'; downloadFile(subtitleText.value, `converted${extension}`, 'text/plain;charset=utf-8'); });
+        convertCorrectionFormatButton.addEventListener('click', () => { const { map } = parseOldCorrectionFormat(correctionText.value, false); const newFormatLines = []; for(const original in map) { newFormatLines.push(`-<${original}[${map[original] === null ? '' : map[original]}]>`); } if(newFormatLines.length > 0) { correctionText.value = newFormatLines.join('\n'); alert('修正檔格式轉換成功！'); } else { alert('未找到可轉換的舊格式內容。'); } });
+        fixButton.addEventListener('click', () => { const subtitle = subtitleText.value; const correction = correctionText.value; if (!subtitle || !correction) { alert("請提供字幕和修正檔內容。"); return; } const correctionMap = parseCorrection(correction, removeBrackets.checked); if (Object.keys(correctionMap).length === 0) { alert("未找到有效的修正規則。"); return; } const parsedData = parseSubtitle(subtitle); if (parsedData.length === 0) { alert("無法解析字幕檔，請檢查字幕格式。"); return; } const result = applyCorrections(parsedData, correctionMap); correctedSubtitle = rebuildSubtitle(result.modifiedData); outputText.value = `總共修正了 ${result.correctionCount} 處字幕錯誤：\n\n${result.outputLog}`; });
+        downloadButton.addEventListener('click', () => { if(!correctedSubtitle){ alert("請先修正字幕。"); return; } downloadFile(correctedSubtitle, 'corrected_subtitle.txt', 'text/plain;charset=utf-8'); });
+        function detectSubtitleFormat(text) { const lines = text.trim().split('\n').filter(Boolean); if (lines.length === 0) return 'unknown'; if (lines[0].trim().startsWith('[') && lines[0].includes('-->')) return 'formatVttLike'; const srtRegex = /^\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}$/; if (/^\d+$/.test(lines[0]) && lines[1] && srtRegex.test(lines[1].trim())) return 'formatSrt'; return 'unknown'; }
+        function parseSubtitle(text) { const format = detectSubtitleFormat(text); const parsed = []; if (format === 'formatSrt') { text.trim().split(/\n\s*\n/).forEach(block => { const lines = block.split('\n'); const timeMatch = lines[1]?.match(/(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})/); if (lines[0]?.match(/^\d+$/) && timeMatch) { parsed.push({ index: lines[0], start: timeMatch[1], end: timeMatch[2], text: lines.slice(2).join('\n'), originalFormat: 'formatSrt' }); } }); } else if (format === 'formatVttLike') { const lineRegex = /\[(.*?) --> (.*?)\]\s*(.*)/s; text.trim().split('\n').forEach((line, index) => { const match = line.match(lineRegex); if(match) { parsed.push({ index: index + 1, start: match[1].trim(), end: match[2].trim(), text: match[3].trim(), originalFormat: 'formatVttLike' }); } }); } return parsed; };
+        function rebuildSubtitle(parsedData) { if (!parsedData || parsedData.length === 0) return ""; const formatToBuild = parsedData[0].targetFormat || parsedData[0].originalFormat; const blocks = parsedData.map(item => { if(formatToBuild === 'formatSrt') { return `${item.index}\n${item.start} --> ${item.end}\n${item.text}`; } else { return `[${item.start} --> ${item.end}] ${item.text}`; } }); const separator = formatToBuild === 'formatSrt' ? '\n\n' : '\n'; return blocks.join(separator); };
+        function parseOldCorrectionFormat(text, shouldRemoveBrackets) { const corrections = {}; const lines = text.split('\n').filter(Boolean); for (let i = 0; i < lines.length; i += 2) { if (lines[i]?.startsWith('- 原始字幕內容：') && lines[i + 1]?.startsWith('- 建議修正內容：')) { const originalText = lines[i].substring(11).trim(); let correctedText = lines[i + 1].substring(11).trim(); if (correctedText === "(保留原樣)") correctedText = null; else if (shouldRemoveBrackets) correctedText = correctedText.replace(/（[^）]*）/g, '').replace(/\([^\)]*\)/g, '').trim(); originalText.split(',').map(o => o.trim()).filter(Boolean).forEach(o => { corrections[o] = correctedText; }); } } return { map: corrections }; };
+        function parseNewCorrectionFormat(text, shouldRemoveBrackets) { const corrections = {}; text.split('\n').forEach(line => { const match = line.trim().match(/-<(.*?)\[(.*?)\]>/s); if (match) { let corrected = match[2].trim(); if (shouldRemoveBrackets) corrected = corrected.replace(/（[^）]*）/g, '').replace(/\([^\)]*\)/g, '').trim(); if (match[1].trim()) corrections[match[1].trim()] = corrected === '' ? null : corrected; } }); return { map: corrections }; };
+        function parseCorrection(text, shouldRemoveBrackets) { const newMap = parseNewCorrectionFormat(text, shouldRemoveBrackets).map; if(Object.keys(newMap).length > 0) return newMap; return parseOldCorrectionFormat(text, shouldRemoveBrackets).map; };
+        function applyCorrections(parsedData, correctionMap) { let outputLog = ''; let correctionCount = 0; const modifiedData = JSON.parse(JSON.stringify(parsedData)); modifiedData.forEach(item => { let originalText = item.text; let hasCorrection = false; for (const original in correctionMap) { if (item.text.includes(original)) { const replacement = correctionMap[original]; if (replacement !== null) { const newText = item.text.replace(new RegExp(escapeRegExp(original), 'g'), replacement); if(newText !== item.text) { item.text = newText; hasCorrection = true; correctionCount++; } } } } if (hasCorrection) { outputLog += `修正字幕行(${item.index}):\n- 原文: ${originalText.replace(/\n/g, ' ')}\n- 修正: ${item.text.replace(/\n/g, ' ')}\n\n`; } }); return { modifiedData, outputLog: outputLog || "未發現需要修正的內容。\n", correctionCount }; };
+    
+        // Initial population on page load (in case of browser cache)
+        handleSubtitleTextChange();
+    });
+    </script>
+</body>
+</html>
