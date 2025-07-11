@@ -1,0 +1,2182 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕全能工具 (UX Pro v8.5.5 - Polished UI)</title>
+    <style>
+        :root {
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans TC", sans-serif;
+            --font-mono: "SF Mono", "Consolas", "Liberation Mono", Menlo, monospace;
+            
+            --primary-color: #007aff;
+            --primary-color-light: #e6f2ff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --info-bg-1: #e9f5f8;
+            --info-bg-2: #fef5e7;
+
+            --bg-color: #f8f9fa;
+            --surface-color: #ffffff;
+            --surface-color-secondary: #f1f3f5;
+            --text-color: #212529;
+            --text-color-muted: #6c757d;
+            --border-color: #dee2e6;
+            --shadow-color: rgba(0, 0, 0, 0.05);
+            --shadow-color-strong: rgba(0, 0, 0, 0.1);
+            --backdrop-filter-color: rgba(0, 0, 0, 0.5);
+
+            --tool-panel-width: 320px;
+            --radius-sm: 3px;
+            --radius-md: 6px;
+            --radius-lg: 12px;
+            --transition-speed: 0.25s;
+            --video-pinned-height: 40vh;
+            --audio-bar-height: 44px;
+        }
+        
+        body.dark-mode {
+            --primary-color: #0a84ff;
+            --primary-color-light: #1c3d5e;
+            --secondary-color: #8e8e93;
+            --success-color: #30d158;
+            --danger-color: #ff453a;
+            --warning-color: #ff9f0a;
+            --info-color: #64d2ff;
+            --info-bg-1: #2c3e50;
+            --info-bg-2: #4a4030;
+
+            --bg-color: #0d1117;
+            --surface-color: #161b22;
+            --surface-color-secondary: #21262d;
+            --text-color: #e6edf3;
+            --text-color-muted: #848d97;
+            --border-color: #30363d;
+            --shadow-color: rgba(0, 0, 0, 0.2);
+            --shadow-color-strong: rgba(0, 0, 0, 0.4);
+            --backdrop-filter-color: rgba(10, 10, 10, 0.6);
+        }
+
+        /* --- General Resets & Typography --- */
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { 
+            font-family: var(--font-main);
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            margin: 0;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
+            overflow: hidden;
+        }
+        h1, h2, h3, h4, p { margin: 0; }
+        h1 { font-size: 1.5rem; font-weight: 700; color: var(--primary-color); }
+        h2 { font-size: 1.15rem; font-weight: 600; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; color: var(--text-color);}
+        h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-color);}
+
+        /* --- Core Layout System --- */
+        .zenith-container { display: flex; height: 100vh; }
+        #tool-panel {
+            width: var(--tool-panel-width); background-color: var(--surface-color); border-right: 1px solid var(--border-color);
+            padding: 1rem 0.75rem; transition: margin-left var(--transition-speed) ease; overflow-y: auto; flex-shrink: 0; z-index: 200;
+        }
+        #main-content-wrapper { 
+            flex-grow: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+            transition: padding-top var(--transition-speed) ease;
+        }
+        
+        #main-content { 
+            flex-grow: 1; 
+            padding: 1rem; 
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-header {
+            display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;
+            padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        
+        #main-grid-wrapper { 
+            display: grid; 
+            gap: 1rem; 
+            flex-grow: 1;
+            min-height: 0;
+        }
+
+        /* --- 智慧佈局系統 --- */
+        
+        /* 寬螢幕佈局 (>= 993px) */
+        @media (min-width: 993px) {
+            #main-grid-wrapper { grid-template-columns: 1fr 1fr; }
+            #input-column { grid-row: 1 / 2; }
+            #right-pane-wrapper { display: flex; flex-direction: column; gap: 1rem; min-height: 0; }
+            
+            /* 檢視模式: 修正詞庫 */
+            #main-grid-wrapper.view-mode-controls #output-column { display: none; }
+            /* [UX Pro 大師級微調] 讓修正詞庫欄位在可見時填滿高度 */
+            #main-grid-wrapper.view-mode-controls #controls-column { flex-grow: 1; }
+
+            /* 檢視模式: 修正結果 */
+            #main-grid-wrapper.view-mode-output #controls-column { display: none; }
+            #main-grid-wrapper.view-mode-output #output-column { flex-grow: 1; }
+        }
+        
+        /* 窄螢幕佈局 (< 993px) */
+        @media (max-width: 992px) {
+            #main-content { padding: 0.75rem; }
+            #main-grid-wrapper { grid-template-columns: 1fr; }
+            #right-pane-wrapper { display: contents; }
+
+            #input-column { order: 1; }
+            #controls-column { order: 2; }
+            #output-column { order: 3; }
+            
+            #main-grid-wrapper.view-mode-controls #output-column { display: none; }
+            #main-grid-wrapper.view-mode-output #controls-column { display: none; }
+            
+            /* [UX Pro 大師級微調] 黃金比例：沉浸式比對佈局 (5.5 : 4.5) */
+            #main-grid-wrapper.view-mode-output #input-column {
+                height: 40.5vh;
+                flex-shrink: 0;
+            }
+            #main-grid-wrapper.view-mode-output #output-column {
+                height: 49.5vh;
+                flex-shrink: 0;
+            }
+        }
+        
+        /* Tool Panel Collapsing Logic */
+        @media (min-width: 993px) { body.tool-panel-closed #tool-panel { margin-left: calc(-1 * var(--tool-panel-width)); } }
+        @media (max-width: 992px) {
+            #tool-panel {
+                position: fixed; top: 0; bottom: 0; left: calc(-1 * var(--tool-panel-width) - 10px);
+                box-shadow: 5px 0 15px var(--shadow-color-strong); transition: left var(--transition-speed) ease;
+            }
+            body.tool-panel-open #tool-panel { left: 0; }
+            
+            #persistent-bottom-bar {
+                width: auto;
+                left: 0.75rem;
+                right: 0.75rem;
+                margin-left: auto;
+                margin-right: auto;
+                justify-content: space-between;
+            }
+
+            body.video-pinned #floatingVideoContainer,
+            #floatingVideoContainer.audio-only-mode {
+                left: 0.75rem;
+                right: 0.75rem;
+                width: auto;
+            }
+        }
+
+        /* --- UI Components --- */
+        .card {
+            background-color: var(--surface-color); border-radius: var(--radius-lg); border: 1px solid var(--border-color);
+            padding: 1rem; box-shadow: 0 2px 8px var(--shadow-color); transition: all var(--transition-speed) ease;
+            display: flex; flex-direction: column;
+            min-height: 0;
+        }
+        .card-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem; flex-shrink: 0; }
+        .card-title { font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; color: var(--text-color)}
+        .card-title .icon { color: var(--primary-color); font-style: normal; }
+        .card-content { flex-grow: 1; display: flex; flex-direction: column; min-height: 0; }
+        textarea {
+            width: 100%; flex-grow: 1; min-height: 150px;
+            background-color: var(--surface-color-secondary); border: 1px solid var(--border-color);
+            border-radius: var(--radius-md); padding: 0.75rem; font-family: var(--font-mono); font-size: 0.9em; color: var(--text-color);
+            line-height: 1.6; resize: vertical; transition: all var(--transition-speed) ease;
+        }
+        textarea:focus { background-color: var(--surface-color); border-color: var(--primary-color); box-shadow: 0 0 0 2px var(--primary-color-light); outline: none; }
+        input[type="text"], input[type="number"] {
+            width: 100%; padding: 0.5rem 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);
+            background-color: var(--surface-color-secondary); color: var(--text-color); font-size: 0.95em; transition: all var(--transition-speed) ease;
+        }
+        input[type="text"]:focus, input[type="number"]:focus { background-color: var(--surface-color); border-color: var(--primary-color); box-shadow: 0 0 0 2px var(--primary-color-light); outline: none; }
+        label { display: block; margin-bottom: 0.25rem; font-weight: 500; font-size: 0.85rem; color: var(--text-color-muted); }
+        button {
+            font-family: var(--font-main); background-color: var(--primary-color); color: white; padding: 0.5rem 1rem; border: none;
+            border-radius: var(--radius-md); cursor: pointer; font-size: 0.95rem; font-weight: 500; user-select: none; display: inline-flex;
+            align-items: center; justify-content: center; gap: 0.5rem; transition: all var(--transition-speed) ease;
+        }
+        button:hover { filter: brightness(1.1); }
+        button:active { filter: brightness(0.9); transform: scale(0.98); }
+        button:disabled { background-color: var(--secondary-color); opacity: 0.5; cursor: not-allowed; }
+        button.secondary { background-color: var(--surface-color-secondary); color: var(--text-color); border: 1px solid var(--border-color); }
+        button.secondary:hover { background-color: var(--primary-color-light); color: var(--primary-color); border-color: var(--primary-color); }
+        .button-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+        .card-header-controls { display: flex; align-items: center; gap: 0.5rem; }
+        .file-dropzone.compact {
+            padding: 0.2rem 0.5rem; border-style: solid; border-width: 1px; font-size: 0.8rem; text-align: center;
+            position: relative; cursor: pointer; border-radius: var(--radius-sm);
+        }
+        .file-dropzone.compact .file-dropzone-text { white-space: nowrap; }
+        .file-dropzone.compact:hover { border-color: var(--primary-color); color: var(--primary-color); }
+        .file-dropzone.compact input[type="file"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .card-header-controls button { padding: 0.2rem 0.5rem; font-size: 0.8rem; }
+
+        /* --- Specific Component Styles --- */
+        #tool-panel .tool-panel-header { text-align: center; margin-bottom: 1.5rem; }
+        #tool-panel .tool-panel-header h3 { font-size: 1.1rem; color: var(--text-color); }
+        .accordion-item { margin-bottom: 0.75rem; }
+        .accordion-header {
+            background-color: transparent; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: var(--radius-md);
+            cursor: pointer; font-weight: 600; display: flex; justify-content: space-between; align-items: center; transition: all var(--transition-speed) ease;
+        }
+        .accordion-header:hover { background-color: var(--surface-color-secondary); border-color: var(--primary-color); color: var(--primary-color); }
+        .accordion-item.active .accordion-header { background-color: var(--primary-color-light); border-color: var(--primary-color); color: var(--primary-color); }
+        .accordion-header::after { content: '▼'; transition: transform var(--transition-speed) ease; font-size: 0.8rem; }
+        .accordion-item.active .accordion-header::after { transform: rotate(180deg); }
+        .accordion-content {
+            padding: 1rem 0.75rem 0.75rem 0.75rem; display: none; margin-top: -1px; border: 1px solid var(--border-color);
+            border-top: none; border-radius: 0 0 var(--radius-md) var(--radius-md);
+        }
+        .accordion-item.active .accordion-content { display: block; }
+        .control-group { margin-bottom: 1rem; }
+        .control-group label { display: inline-flex; align-items: center; cursor: pointer; }
+        .tab-container { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 1rem; }
+        .tab { padding: 8px 15px; cursor: pointer; background: transparent; border: 1px solid transparent; border-bottom: none; margin-bottom: -2px; border-radius: 4px 4px 0 0; }
+        .tab.active { background-color: var(--surface-color); border: 1px solid var(--border-color); border-bottom: 2px solid var(--surface-color); font-weight: bold; }
+        .tab-content { display: none; padding-top: 0.5rem; }
+        .tab-content.active { display: block; }
+        
+        #anchorSync .control-group.original, #subtitleCut .control-group.original { background-color: var(--info-bg-1); padding: 0.75rem; border-radius: var(--radius-md); }
+        #anchorSync .control-group.target, #subtitleCut .control-group.target { background-color: var(--info-bg-2); padding: 0.75rem; border-radius: var(--radius-md); }
+
+        #controls-column .card-title .icon, #input-column .card-title .icon { color: var(--primary-color); }
+        #output-column .card-title .icon { color: var(--success-color); }
+
+        #outputLog { width: 100%; flex-grow: 1; overflow-y: auto; padding-right: 0.5rem; }
+
+        #correctionSummaryContainer { font-size: 0.85em; text-align: right; }
+        #correctionSummary { font-weight: 500; margin-bottom: 0.25rem; }
+        #correctionSummary .hidden-summary a { color: var(--info-color); text-decoration: none; font-weight: normal; cursor: pointer; }
+        #correctionSummary .hidden-summary a:hover { text-decoration: underline; }
+        .inline-controls-group { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem;}
+        .inline-controls-group label { margin-left: 0; }
+        #toggleRevertControlsBtn, #globalPauseBtn { font-size: 0.85em; padding: 2px 6px; cursor: pointer; }
+
+        .diff-line { background: var(--surface-color-secondary); border: 1px solid transparent; border-left: 3px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem; margin-bottom: 0.75rem; transition: all var(--transition-speed) ease; }
+        .diff-line:hover { border-left-color: var(--primary-color); box-shadow: 0 2px 8px var(--shadow-color); }
+        .diff-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem 1rem; }
+        .diff-header-title-group { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+        .diff-header-title { font-weight: 600; cursor: pointer; font-size: 0.95em; }
+        .diff-header-title:hover { color: var(--primary-color); }
+        .archive-rule-label { font-size: 0.8rem; color: var(--text-color-muted); font-weight: 400; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; }
+        .archive-rule-label:hover { color: var(--danger-color); }
+        .diff-line[data-archived-by-rule="true"] { opacity: 0.4; border-left-color: var(--secondary-color); pointer-events: none; }
+        .diff-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+        .count-tag { font-weight: normal; font-size: 0.75em; padding: 2px 5px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background-color: var(--surface-color); }
+        .count-tag a { color: inherit; text-decoration: none; }
+        .count-tag .from { color: var(--danger-color); font-weight: 500; }
+        .count-tag .to { color: var(--success-color); font-weight: 500; }
+        .diff-content { font-family: var(--font-mono); font-size: 0.85em; line-height: 1.6; word-break: break-all; }
+        .diff-label { font-weight: bold; width: 40px; display: inline-block; color: var(--text-color-muted); }
+        .added { background-color: rgba(40, 167, 69, 0.2); color: var(--success-color); border-radius: var(--radius-sm); padding: 1px 3px; font-weight: 500; }
+        .removed { background-color: rgba(220, 53, 69, 0.2); color: var(--danger-color); text-decoration: none; border-radius: var(--radius-sm); padding: 1px 3px; font-weight: 500; }
+        .revert-controls { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border-color); font-size: 0.85em; }
+        
+        /* UX PRO FIX: Enhanced preview area for better visual balance and usability. */
+        #linkedCorrectionsPreview {
+            margin-top: 0.75rem;
+            flex-grow: 1; /* Allow this container to grow and fill available space */
+            min-height: 120px; /* Set a minimum height to avoid collapsing */
+            overflow-y: auto;
+            padding: 0.5rem;
+            border-radius: var(--radius-md);
+            background-color: var(--surface-color-secondary);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-content: flex-start; /* Align content to the top */
+        }
+        #linkedCorrectionsPreview:not(:empty) { border: 1px solid var(--border-color); }
+
+        #bottom-bar-wrapper {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            z-index: 1009; transition: transform var(--transition-speed) ease;
+        }
+        body.bottom-bar-collapsed #bottom-bar-wrapper {
+            transform: translateY(100%);
+        }
+        #persistent-bottom-bar {
+            position: relative;
+            width: fit-content; max-width: calc(100% - 2rem); margin: 0 auto 1rem auto;
+            background-color: color-mix(in srgb, var(--surface-color) 80%, transparent);
+            border: 1px solid var(--border-color); padding: 0.5rem; display: flex; align-items: center; gap: 0.5rem;
+            box-shadow: 0 4px 20px var(--shadow-color-strong); border-radius: var(--radius-lg); backdrop-filter: blur(10px);
+        }
+        #expand-bottom-bar-btn {
+            width: 38px; height: 38px; border-radius: 50%;
+            border: 1px solid var(--border-color);
+            background-color: var(--surface-color-secondary);
+            font-size: 1.2rem; display: none; align-items: center; justify-content: center;
+            cursor: pointer; transition: all var(--transition-speed) ease;
+            margin-left: auto; padding: 0;
+        }
+        #expand-bottom-bar-btn:hover {
+            background-color: var(--primary-color-light); color: var(--primary-color);
+            transform: scale(1.1) rotate(180deg);
+        }
+        body.bottom-bar-collapsed #expand-bottom-bar-btn {
+            display: flex;
+        }
+        #persistent-bottom-bar button { padding: 0.5rem 1rem; }
+        #persistent-bottom-bar button.active { background-color: var(--primary-color-light); color: var(--primary-color); border-color: var(--primary-color); }
+        #bottomBarCollapseBtn { min-width: 38px; }
+
+        @media (max-width: 768px) {
+            #persistent-bottom-bar .btn-text { display: none; }
+        }
+
+        /* --- Video Player --- */
+        #floatingVideoContainer {
+            position: fixed; top: 2rem; right: 2rem; width: 480px; height: 270px;
+            background-color: var(--surface-color); border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+            box-shadow: 0 8px 30px var(--shadow-color-strong);
+            z-index: 2000; resize: both; overflow: hidden; display: none;
+            flex-direction: column; transition: all var(--transition-speed) ease;
+        }
+        body.video-pinned #main-content-wrapper { padding-top: var(--video-pinned-height); }
+        body.video-pinned #floatingVideoContainer {
+            top: 0; left: 0; right: 0; width: 100%; height: var(--video-pinned-height); max-height: 500px;
+            border-radius: 0; border: none; border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 5px 15px var(--shadow-color-strong); resize: none;
+            transform: none !important;
+        }
+        #pinVideoBtn.active { background-color: var(--primary-color); color: white; }
+
+        #floatingVideoContainer .window-header { padding: 5px 10px; background: var(--surface-color-secondary); cursor: move; display: flex; justify-content: space-between; align-items: center; }
+        #player-container { flex-grow: 1; background-color: #000; }
+        #player-container iframe, #player-container video { width: 100%; height: 100%; border: none; }
+        
+        body.audio-mode-active #main-content-wrapper {
+            padding-top: var(--audio-bar-height);
+        }
+        #floatingVideoContainer.audio-only-mode {
+            top: 0; left: 0; right: 0; width: 100%;
+            height: var(--audio-bar-height);
+            border-radius: 0; border: none;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 2px 5px var(--shadow-color);
+            background-color: var(--surface-color-secondary);
+            resize: none;
+            overflow: hidden;
+            transform: none !important;
+        }
+        #floatingVideoContainer.audio-only-mode .window-header {
+            height: 100%;
+            padding: 0 1rem;
+            cursor: default;
+        }
+        #floatingVideoContainer.audio-only-mode #player-container {
+            display: none;
+        }
+
+
+        /* --- Modals --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--backdrop-filter-color);
+            -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+            display: none; justify-content: center; align-items: center; z-index: 3000;
+            animation: fadeIn var(--transition-speed) ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-container {
+            background-color: var(--surface-color); padding: 1.5rem; border-radius: var(--radius-lg);
+            box-shadow: 0 10px 40px var(--shadow-color-strong); width: 90%; max-width: 800px;
+            max-height: 85vh; display: flex; flex-direction: column;
+            animation: slideIn var(--transition-speed) ease-out; border: 1px solid var(--border-color);
+        }
+        #correctionManagementContent {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            min-height: 0;
+        }
+        #correctionManagementContent > #controls-column {
+            flex-grow: 1;
+            padding: 0;
+            border: none;
+            box-shadow: none;
+            background-color: transparent;
+        }
+        #correctionManagementContent > #controls-column .card-content {
+            padding: 0;
+        }
+
+        @keyframes slideIn { from { transform: translateY(20px) scale(0.98); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+        .modal-header { border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1rem; }
+        .modal-content { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; }
+        .modal-footer { border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+        .modal-tab-container { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 10px; }
+        .modal-tab { padding: 8px 15px; cursor: pointer; background: transparent; border: 1px solid transparent; border-bottom: none; margin-bottom: -1px; border-radius: 4px 4px 0 0; font-size: 0.9em; }
+        .modal-tab.active { background-color: var(--surface-color); border: 1px solid var(--border-color); border-bottom-color: var(--surface-color); font-weight: bold; }
+        .modal-content ul { list-style: none; padding: 0; margin: 0;}
+        .modal-content li { padding: 8px 5px; border-bottom: 1px solid var(--border-color); }
+        .modal-content li:last-child { border-bottom: none; }
+        .modal-content li label { font-weight: normal; cursor: pointer; display: flex; align-items: flex-start; gap: 8px; }
+        .modal-content li .reason-cancelled { color: var(--danger-color); font-style: italic; font-weight: bold; }
+        .modal-content li .reason-archived { color: var(--success-color); font-style: italic; font-weight: bold; }
+        .highlight { background-color: color-mix(in srgb, var(--warning-color) 40%, transparent); color: var(--text-color); padding: 1px 3px; border-radius: var(--radius-sm); font-weight: 500; }
+    </style>
+</head>
+<body class="tool-panel-closed">
+
+    <div class="zenith-container">
+        <aside id="tool-panel">
+            <div class="tool-panel-header"><h3>🛠️ 工具箱</h3></div>
+            <div id="timeline-section-accordion" class="accordion-item">
+                <div class="accordion-header">⏱️ 時間軸工具</div>
+                <div class="accordion-content">
+                    <div class="tab-container">
+                        <div class="tab active" onclick="openTab(event, 'directAdjust')">直接調整</div><div class="tab" onclick="openTab(event, 'anchorSync')">錨點同步</div><div class="tab" onclick="openTab(event, 'subtitleCut')">字幕切割</div><div class="tab" onclick="openTab(event, 'subtitleMerge')">字幕合併</div>
+                    </div>
+                    <div id="directAdjust" class="tab-content active"><div class="control-group"><label for="timeShift">時間偏移 (+/-HH:MM:SS,ms)</label><input type="text" id="timeShift" value="00:00:00,000"></div><div class="control-group"><label for="speedFactorDirect">速率因子</label><input type="number" id="speedFactorDirect" value="1.0" step="0.01" min="0.1"></div><div class="button-group"><button id="applyDirectAdjust">套用</button><button id="downloadDirectAdjustBtn" class="secondary">下載</button></div></div>
+                    <div id="anchorSync" class="tab-content"><div class="control-group original"><label for="originalStart">原始字幕起始 (自動偵測)</label><input type="text" id="originalStart" value="00:00:00,000"></div><div class="control-group original"><label for="originalEnd">原始字幕結束 (自動偵測)</label><input type="text" id="originalEnd" value="00:00:00,000"></div><div class="control-group target"><label for="targetStart">對照影片起始</label><input type="text" id="targetStart" value="00:00:00,000"></div><div class="control-group target"><label for="targetEnd">對照影片結束</label><input type="text" id="targetEnd" value="00:00:00,000"></div><button id="calculateSync">計算參數</button><div class="info-panel" id="syncInfo" style="margin-top: 1rem;">請設定時間錨點後點擊計算。</div><div class="button-group" id="anchorSyncApplyButtonGroup" style="margin-top: 10px;"><button id="applyAnchorSync" disabled>套用</button><button id="downloadAnchorSyncBtn" class="secondary" disabled>下載</button></div></div>
+                    <div id="subtitleCut" class="tab-content"><div class="control-group original"><label for="cutStart">切割起始時間</label><input type="text" id="cutStart" value="00:00:00,000"></div><div class="control-group original"><label for="cutStartLine">切割起始行號</label><input type="number" id="cutStartLine" min="1" value="1"></div><div class="control-group target"><label for="cutEnd">切割結束時間 (自動偵測)</label><input type="text" id="cutEnd" value="00:00:00,000"></div><div class="control-group target"><label for="cutEndLine">切割結束行號 (自動偵測)</label><input type="number" id="cutEndLine" min="1" value="1"></div><div class="button-group"><button id="applyCut">應用切割</button><button id="downloadCutBtn" class="secondary">下載</button></div></div>
+                    <div id="subtitleMerge" class="tab-content"><label for="mergeFile1">檔案 1 (基礎字幕)</label><input type="file" id="mergeFile1"><textarea id="mergeFile1Content" rows="3" placeholder="預覽..." style="min-height: 80px; margin-top:0.5rem;"></textarea><label for="mergeFile2" style="margin-top: 1rem;">檔案 2 (附加字幕)</label><input type="file" id="mergeFile2"><textarea id="mergeFile2Content" rows="3" placeholder="預覽..." style="min-height: 80px; margin-top:0.5rem;"></textarea><div class="button-group" style="gap: 10px; margin-top: 1rem; flex-direction:column;"><button id="mergeSubtitlesBtn">合併至主編輯區</button><button id="downloadMergedBtn" class="secondary">直接下載合併檔</button><button id="addAndMergeBtn" class="secondary" style="display: none;" title="將合併結果放回檔案1">+ 合併檔案</button></div></div>
+                </div>
+            </div>
+            <div id="video-controls-accordion" class="accordion-item"><div class="accordion-header">📹 影片播放器</div><div class="accordion-content" id="video-controls-section-wrapper"><div id="video-controls-section"><div class="control-group"><div style="display: flex; gap: 1rem; margin-bottom: 1rem;"><label><input type="checkbox" id="toggleVideoPlayerCheckbox"> 顯示播放器</label><label><input type="checkbox" id="pinVideoPlayerCheckbox"> 劇院模式</label><label><input type="checkbox" id="audioOnlyModeCheckbox"> 只播聲音</label><label><input type="checkbox" id="followVideoToggleModal"> 字幕跟隨</label></div><div style="margin-bottom: 1rem;"><label for="videoUrlInput">影片來源 (YouTube/本地檔)</label><div style="display: flex; gap: 10px;"><input type="text" id="videoUrlInput" placeholder="貼上網址或選擇檔案"><button id="loadVideoBtn">載入</button><input type="file" id="localVideoFile" accept="video/*" style="display: none;"></div></div><div><label style="font-weight:normal;"><input type="checkbox" id="videoKeepPlayingOnCloseToggle" disabled> 關閉(X)時續播</label><label style="font-weight:normal;"><input type="checkbox" id="videoReleaseMemoryOnCloseToggle" disabled> 關閉時釋放記憶體</label><input type="checkbox" id="followVideoToggle" style="display:none;"></div></div></div></div></div>
+            <div id="settings-accordion" class="accordion-item"><div class="accordion-header">⚙️ 項目設定</div><div class="accordion-content" id="settingsModalContent"><div class="control-group"><label><input type="checkbox" id="windowStackingToggle" style="margin-right: 0.5rem;"> 開啟視窗階級 (返回上層)</label></div><div class="control-group"><label><input type="checkbox" id="defaultShowRevertToggle" style="margin-right: 0.5rem;"> 預設顯示修改選項</label></div><div class="control-group"><label><input type="checkbox" id="unpinOnCloseToggle" style="margin-right: 0.5rem;" checked> 影片關閉時取消劇院模式</label></div></div></div>
+            <div id="resources-accordion" class="accordion-item"><div class="accordion-header">🔗 外部資源</div><div class="accordion-content"><a href="https://colab.research.google.com/drive/1RzNeqAA5duszSyVWL3a65eHInfwyusci#scrollTo=-U10L-FaUDPA" target="_blank" rel="noopener noreferrer" class="button secondary" style="width:100%;"><span>☁️</span> Whisper@Colab</a></div></div>
+        </aside>
+        
+        <div id="main-content-wrapper">
+            <main id="main-content">
+                <header class="main-header">
+                    <h1>字幕全能工具 <span style="font-size: 0.5em; color: var(--text-color-muted); font-weight: 400;">v8.5.5</span></h1>
+                    <button id="expand-bottom-bar-btn" title="展開工具列">☰</button>
+                </header>
+                <div id="main-grid-wrapper" class="view-mode-controls">
+                    <div id="input-column" class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="icon">📄</i> 原始字幕</h3>
+							<div class="card-header-controls" id="subtitleTextActions">
+								<div class="file-dropzone compact">
+									<input type="file" id="subtitleFile"><span class="file-dropzone-text">拖放檔案</span>
+								</div>
+								<button id="convertSubtitleFormatButton" class="secondary">格式轉換</button>
+								<!-- [大師級修正] 新增字幕預覽按鈕 -->
+								<button id="previewSubtitleBtn" class="secondary" title="將當前修正結果應用於左側預覽">字幕預覽</button>
+							</div>
+                        </div>
+                        <div class="card-content">
+                            <textarea id="subtitleText" placeholder="在此貼上字幕內容..."></textarea>
+                        </div>
+                    </div>
+                    <div id="right-pane-wrapper">
+                        <div id="controls-column" class="card">
+                            <div class="card-header">
+                                <h3 class="card-title"><i class="icon">🔧</i> 修正詞庫</h3>
+                                <div class="card-header-controls" id="correctionTextActions">
+                                    <div class="file-dropzone compact">
+                                        <input type="file" id="correctionFile"><span class="file-dropzone-text">拖放檔案</span>
+                                    </div>
+                                    <button id="convertCorrectionFormatButton" class="secondary">格式轉換</button>
+                                </div>
+                            </div>
+                            <div class="card-content">
+                                <textarea id="correctionText" placeholder="貼上修正詞內容..."></textarea>
+                                <div id="linkedCorrectionsPreview" style="display:none;"></div>
+								<!-- 按鈕區塊 -->
+								<div class="button-group" style="margin-top: 1rem; flex-direction: column; gap: 0.75rem;">
+									<button id="fixButton" style="width: 100%; padding: 0.75rem;">🚀 執行字幕修正</button>
+									<!-- UX PRO FIX: New specific ID for the secondary buttons group -->
+									<div id="main-secondary-actions" class="button-group" style="gap: 0.5rem;">
+										<button id="compareAndGenerateButton" class="secondary" style="flex-grow: 1;">比對生成</button>
+										<button id="linkCorrectionsBtn" class="secondary" style="flex-grow: 1;">連結修正詞</button>
+									</div>
+								</div>
+                            </div>
+                        </div>
+                        <div id="output-column" class="card">
+                            <div class="card-header">
+                                <h3 class="card-title"><i class="icon">✨</i> 修正結果</h3>
+                                <div id="correctionSummaryContainer" style="display: none;">
+                                    <p id="correctionSummary"></p>
+                                    <div class="inline-controls-group">
+										<button id="rewindBtn" class="secondary" title="倒退 5 秒 (F9)" style="display: none;">⏪</button>
+										<button id="globalPauseBtn" class="secondary" title="播放/暫停 (F8)" style="display: none;">▶️</button>
+										<button id="forwardBtn" class="secondary" title="快進 5 秒 (F10)" style="display: none;">⏩</button>
+										<button id="toggleRevertControlsBtn" class="secondary">隱藏選項</button>
+                                        <label id="hideCancelledRulesContainer"><input type="checkbox" id="hideCancelledRulesToggle"> 隱藏已取消</label>
+                                        <label id="removeBracketsContainer"><input type="checkbox" id="removeBrackets"> 去除括號</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-content">
+                                <div id="outputLog"><div style="text-align:center; color: var(--text-color-muted); height: 100%; display:flex; align-items:center; justify-content:center;"><p>點擊「執行字幕修正」後<br>結果將會顯示於此</p></div></div>
+                            </div>
+                            <textarea id="newlyAddedRules" style="display:none;"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <div id="bottom-bar-wrapper">
+        <div id="persistent-bottom-bar">
+            <button id="bottomBarToolboxToggle" title="收合/展開工具箱">☰</button>
+            <button id="bottomBarVideoBtn" class="secondary" title="影片播放器設定"><span>📹</span><span class="btn-text">影片</span></button>
+            <button id="bottomBarRulesBtn" class="secondary" title="管理修正詞與格式"><span>📝</span><span class="btn-text">規則</span></button>
+            <button id="bottomBarDownloadSubBtn" title="下載修正後的字幕檔"><span>💾</span><span class="btn-text">下載字幕</span></button>
+            <button id="bottomBarDownloadRulesBtn" class="secondary" title="下載最終使用的修正詞檔案"><span>⚙️</span><span class="btn-text">下載規則</span></button>
+            <button id="bottomBarLayoutBtn" class="secondary" title="切換檢視模式"><span>⇅</span><span class="btn-text">交換</span></button>
+            <button id="darkModeToggleBtn" title="切換顯示模式">🌙</button>
+            <button id="bottomBarCollapseBtn" class="secondary" title="收合工具列">▼</button>
+        </div>
+    </div>
+
+    <div id="floatingVideoContainer"><div class="window-header"><span>影像播放器</span><div class="header-buttons"><button id="toggleFollowBtn" title="字幕跟隨影片">📝➡️</button><button id="minimizePlayerBtn" title="最小化為音訊模式">—</button><button id="pinVideoBtn" title="劇院模式">📌</button><button id="closeVideoBtn" title="關閉播放器">✖</button></div></div><div id="player-container"><div style="width: 100%; height: 100%; background: #222; display:flex; align-items:center; justify-content:center; color: #888;">請載入影片</div></div></div>
+    <div id="correctionModal" class="modal-overlay"><div class="modal-container"><div class="modal-header"><h3 id="modalTitle">管理修正</h3></div><div class="modal-content"><ul id="modalCorrectionList"></ul></div><div class="modal-footer"><div class="modal-footer-group"><button id="modalSelectAll" class="secondary">全選</button><button id="modalDeselectAll" class="secondary">全不選</button></div><div class="modal-footer-group"><button id="modalApplyBtn">應用選擇</button><button id="modalCloseBtn" class="secondary">關閉</button></div></div></div></div>
+    <div id="ruleManagementModal" class="modal-overlay"><div class="modal-container"><div class="modal-header"><h3 id="ruleManagementModalTitle">管理規則</h3></div><div class="modal-content"><ul id="ruleManagementModalList"></ul></div><div class="modal-footer"><div class="modal-footer-group"><button id="ruleManagementSelectAll" class="secondary">全選</button><button id="ruleManagementDeselectAll" class="secondary">全不選</button><button id="ruleManagementArchiveBtn" class="secondary">歸檔已選</button></div><div class="modal-footer-group"><button id="ruleManagementApplyBtn">應用選擇</button><button id="ruleManagementCloseBtn" class="secondary">關閉</button></div></div></div></div>
+    <div id="addedRulesModal" class="modal-overlay"><div class="modal-container"><div class="modal-header"><h3>編輯手動新增的規則</h3></div><div class="modal-content"><textarea id="addedRulesTextarea"></textarea></div><div class="modal-footer"><div class="modal-footer-group"><button id="addedRulesSaveChangesBtn">儲存變更</button><button id="addedRulesCloseBtn" class="secondary">關閉</button></div></div></div></div>
+    <div id="newRuleModal" class="modal-overlay"><div class="modal-container" style="max-width: 550px;"><div class="modal-header"><h3 id="newRuleModalTitle">新增修正規則</h3></div><div class="modal-content"><div id="newRuleFormContainer"></div></div><div class="modal-footer"><button id="listAddedRulesBtn" class="secondary" style="margin-right: auto;">列出已新增規則</button><div class="modal-footer-group"><button id="newRuleConfirmBtn">確認新增</button><button id="newRuleCloseBtn" class="secondary">取消</button></div></div></div></div>
+    <div id="videoSettingsModal" class="modal-overlay"><div class="modal-container" style="max-width: 600px;"><div class="modal-header"><h3>影片設定</h3></div><div class="modal-content" id="videoSettingsContent"></div><div class="modal-footer"><button id="videoSettingsCloseBtn" class="secondary">關閉</button></div></div></div>
+    <div id="correctionManagementModal" class="modal-overlay"><div class="modal-container" style="max-width: 800px;"><div class="modal-header"><h3>修正詞管理</h3></div><div class="modal-content" id="correctionManagementContent"></div><div class="modal-footer"><div class="modal-footer-group" style="flex-wrap: wrap;"><button id="modalLinkCorrectionsBtn" class="secondary">連結修正詞</button><button id="modalCompareAndGenerateButton" class="secondary">比對生成修正詞</button><button id="modalRulesListBtn" class="secondary">列出已新增規則</button><button id="modalRulesStatusBtn" class="secondary">檢視隱藏項目</button><button id="modalListExclusionsBtn" class="secondary">列出避免修正行</button></div><button id="correctionManagementCloseBtn" class="secondary">關閉</button></div></div></div>
+    <div id="exclusionListModal" class="modal-overlay"><div class="modal-container"><div class="modal-header"><h3 id="exclusionListModalTitle">列表</h3></div><div class="modal-content"><ul id="exclusionListModalContent" style="font-size: 0.9em;"></ul></div><div class="modal-footer"><button id="exclusionListModalConfirmBtn" style="margin-right: auto;">應用變更</button><div class="modal-footer-group"><button id="exclusionListModalCloseBtn" class="secondary">關閉</button></div></div></div></div>
+    <!-- [新功能] 下載格式選擇彈窗 -->
+    <div id="downloadFormatModal" class="modal-overlay">
+        <div class="modal-container" style="max-width: 400px;">
+            <div class="modal-header"><h3>選擇下載格式</h3></div>
+            <div class="modal-content">
+                <p>請選擇您想下載的字幕檔案格式：</p>
+                <div class="button-group" style="margin-top: 1.5rem; flex-direction: column; gap: 0.75rem;">
+                    <button id="downloadCurrentFormatBtn">下載當前格式 (SRT / VTT)</button>
+                    <button id="downloadYouTubeVttBtn" class="secondary">下載為 YouTube 格式 (.vtt)</button>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: flex-end;">
+                <button id="downloadFormatCloseBtn" class="secondary">取消</button>
+            </div>
+        </div>
+    </div>
+	
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const body = document.body;
+        document.querySelectorAll('.accordion-item').forEach(item => {
+            const header = item.querySelector('.accordion-header');
+            if(header) { header.addEventListener('click', () => { const isActive = item.classList.contains('active'); document.querySelectorAll('.accordion-item').forEach(i => i.classList.remove('active')); if (!isActive) item.classList.add('active'); }); }
+        });
+        const toolPanelToggle = document.getElementById('bottomBarToolboxToggle');
+        if(toolPanelToggle) {
+            toolPanelToggle.addEventListener('click', (e) => {
+                e.stopPropagation(); body.classList.toggle('tool-panel-closed');
+                body.classList.toggle('tool-panel-open', !body.classList.contains('tool-panel-closed'));
+                toolPanelToggle.classList.toggle('active', !body.classList.contains('tool-panel-closed'));
+            });
+        }
+        document.getElementById('main-content-wrapper').addEventListener('click', () => {
+            if (window.innerWidth <= 992 && body.classList.contains('tool-panel-open')) {
+                body.classList.remove('tool-panel-open'); body.classList.add('tool-panel-closed');
+                if(toolPanelToggle) toolPanelToggle.classList.remove('active');
+            }
+        });
+        ['subtitleFile', 'correctionFile'].forEach(id => {
+            const input = document.getElementById(id); if (!input) return;
+            const dropzone = input.closest('.file-dropzone');
+            if (!dropzone) return;
+            dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+            dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+            dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('dragover'); if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); } });
+        });
+        
+        const layoutBtn = document.getElementById('bottomBarLayoutBtn');
+        const gridWrapper = document.getElementById('main-grid-wrapper');
+        if (layoutBtn && gridWrapper) {
+            layoutBtn.addEventListener('click', () => {
+                const isOutputCurrently = gridWrapper.classList.contains('view-mode-output');
+                gridWrapper.classList.toggle('view-mode-output', !isOutputCurrently);
+                gridWrapper.classList.toggle('view-mode-controls', isOutputCurrently);
+                
+                const hasCorrected = document.getElementById('correctionSummaryContainer').style.display === 'block';
+                const isDefaultView = hasCorrected 
+                    ? gridWrapper.classList.contains('view-mode-output') 
+                    : gridWrapper.classList.contains('view-mode-controls');
+                
+                layoutBtn.classList.toggle('active', !isDefaultView);
+            });
+        }
+        
+        const collapseBtn = document.getElementById('bottomBarCollapseBtn');
+        const expandBtn = document.getElementById('expand-bottom-bar-btn');
+        if (collapseBtn) collapseBtn.addEventListener('click', () => body.classList.add('bottom-bar-collapsed'));
+        if (expandBtn) expandBtn.addEventListener('click', () => body.classList.remove('bottom-bar-collapsed'));
+    });
+    
+    // --- Main Application Logic ---
+    document.addEventListener('DOMContentLoaded', () => {
+        const body = document.body;
+        const subtitleFile = document.getElementById('subtitleFile');
+        const subtitleText = document.getElementById('subtitleText');
+        const correctionFile = document.getElementById('correctionFile');
+        const correctionText = document.getElementById('correctionText');
+        const fixButton = document.getElementById('fixButton');
+        const convertCorrectionFormatButton = document.getElementById('convertCorrectionFormatButton');
+        const compareAndGenerateButton = document.getElementById('compareAndGenerateButton');
+        const correctionSummaryContainer = document.getElementById('correctionSummaryContainer'); 
+        const correctionSummary = document.getElementById('correctionSummary');
+        const outputLogContainer = document.getElementById('output-column').querySelector('.card-content');
+        const hideCancelledRulesToggle = document.getElementById('hideCancelledRulesToggle');
+        const outputLog = document.getElementById('outputLog');
+        const removeBrackets = document.getElementById('removeBrackets');
+        const newlyAddedRules = document.getElementById('newlyAddedRules');
+        const timeShiftInput = document.getElementById('timeShift');
+        const speedFactorDirectInput = document.getElementById('speedFactorDirect');
+        const applyDirectAdjustBtn = document.getElementById('applyDirectAdjust');
+        const downloadDirectAdjustBtn = document.getElementById('downloadDirectAdjustBtn');
+        const originalStartInput = document.getElementById('originalStart');
+        const originalEndInput = document.getElementById('originalEnd');
+        const targetStartInput = document.getElementById('targetStart');
+        const targetEndInput = document.getElementById('targetEnd');
+        const calculateSyncBtn = document.getElementById('calculateSync');
+        const syncInfoPanel = document.getElementById('syncInfo');
+        const applyAnchorSyncBtn = document.getElementById('applyAnchorSync');
+        const downloadAnchorSyncBtn = document.getElementById('downloadAnchorSyncBtn');
+        const anchorSyncApplyButtonGroup = document.getElementById('anchorSyncApplyButtonGroup'); 
+        const cutStartInput = document.getElementById('cutStart');
+        const cutEndInput = document.getElementById('cutEnd');
+        const cutStartLineInput = document.getElementById('cutStartLine');
+        const cutEndLineInput = document.getElementById('cutEndLine');
+        const applyCutBtn = document.getElementById('applyCut');
+        const downloadCutBtn = document.getElementById('downloadCutBtn');
+        const mergeFile1Input = document.getElementById('mergeFile1');
+        const mergeFile2Input = document.getElementById('mergeFile2');
+        const mergeFile1Content = document.getElementById('mergeFile1Content');
+        const mergeFile2Content = document.getElementById('mergeFile2Content');
+        const mergeSubtitlesBtn = document.getElementById('mergeSubtitlesBtn');
+        const downloadMergedBtn = document.getElementById('downloadMergedBtn');
+        const addAndMergeBtn = document.getElementById('addAndMergeBtn');
+        const correctionModal = document.getElementById('correctionModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalCorrectionList = document.getElementById('modalCorrectionList');
+        const modalSelectAll = document.getElementById('modalSelectAll');
+        const modalDeselectAll = document.getElementById('modalDeselectAll');
+        const modalApplyBtn = document.getElementById('modalApplyBtn');
+        const modalCloseBtn = document.getElementById('modalCloseBtn');
+        const addedRulesModal = document.getElementById('addedRulesModal');
+        const addedRulesTextarea = document.getElementById('addedRulesTextarea');
+        const addedRulesSaveChangesBtn = document.getElementById('addedRulesSaveChangesBtn');
+        const addedRulesCloseBtn = document.getElementById('addedRulesCloseBtn');
+        const newRuleModal = document.getElementById('newRuleModal');
+        const newRuleModalTitle = document.getElementById('newRuleModalTitle');
+        const newRuleFormContainer = document.getElementById('newRuleFormContainer');
+        const listAddedRulesBtn = document.getElementById('listAddedRulesBtn');
+        const newRuleConfirmBtn = document.getElementById('newRuleConfirmBtn');
+        const newRuleCloseBtn = document.getElementById('newRuleCloseBtn');
+        const ruleManagementModal = document.getElementById('ruleManagementModal');
+        const ruleManagementModalTitle = document.getElementById('ruleManagementModalTitle');
+        const ruleManagementModalList = document.getElementById('ruleManagementModalList');
+        const ruleManagementSelectAll = document.getElementById('ruleManagementSelectAll');
+        const ruleManagementDeselectAll = document.getElementById('ruleManagementDeselectAll');
+        const ruleManagementArchiveBtn = document.getElementById('ruleManagementArchiveBtn');
+        const ruleManagementApplyBtn = document.getElementById('ruleManagementApplyBtn');
+        const ruleManagementCloseBtn = document.getElementById('ruleManagementCloseBtn');
+        const darkModeToggleBtn = document.getElementById('darkModeToggleBtn');
+        const floatingVideoContainer = document.getElementById('floatingVideoContainer');
+        const videoHeader = floatingVideoContainer.querySelector('.window-header');
+        const pinVideoBtn = document.getElementById('pinVideoBtn');
+        const closeVideoBtn = document.getElementById('closeVideoBtn');
+        const toggleVideoPlayerCheckbox = document.getElementById('toggleVideoPlayerCheckbox');
+        const pinVideoPlayerCheckbox = document.getElementById('pinVideoPlayerCheckbox');
+        const videoUrlInput = document.getElementById('videoUrlInput');
+        const loadVideoBtn = document.getElementById('loadVideoBtn');
+        const localVideoFile = document.getElementById('localVideoFile');
+        const playerContainer = document.getElementById('player-container');
+        const videoControlsSection = document.getElementById('video-controls-section');
+        const videoKeepPlayingOnCloseToggle = document.getElementById('videoKeepPlayingOnCloseToggle');
+        const videoReleaseMemoryOnCloseToggle = document.getElementById('videoReleaseMemoryOnCloseToggle');
+        const followVideoToggle = document.getElementById('followVideoToggle');
+        const toggleFollowBtn = document.getElementById('toggleFollowBtn');
+		const followVideoToggleModal = document.getElementById('followVideoToggleModal'); // [新功能]
+		const downloadFormatModal = document.getElementById('downloadFormatModal'); // [新功能]
+		const downloadCurrentFormatBtn = document.getElementById('downloadCurrentFormatBtn'); // [新功能]
+		const downloadYouTubeVttBtn = document.getElementById('downloadYouTubeVttBtn'); // [新功能]
+		const downloadFormatCloseBtn = document.getElementById('downloadFormatCloseBtn'); // [新功能]
+        const videoSettingsModal = document.getElementById('videoSettingsModal');
+        const videoSettingsContent = document.getElementById('videoSettingsContent');
+        const videoSettingsCloseBtn = document.getElementById('videoSettingsCloseBtn');
+        const correctionManagementModal = document.getElementById('correctionManagementModal');
+        const correctionManagementContent = document.getElementById('correctionManagementContent');
+        const correctionManagementCloseBtn = document.getElementById('correctionManagementCloseBtn');
+        const convertSubtitleFormatButton = document.getElementById('convertSubtitleFormatButton');
+        const bottomBarVideoBtn = document.getElementById('bottomBarVideoBtn');
+        const bottomBarRulesBtn = document.getElementById('bottomBarRulesBtn');
+        const bottomBarDownloadSubBtn = document.getElementById('bottomBarDownloadSubBtn');
+        const bottomBarDownloadRulesBtn = document.getElementById('bottomBarDownloadRulesBtn');
+        const modalRulesListBtn = document.getElementById('modalRulesListBtn');
+        const modalRulesStatusBtn = document.getElementById('modalRulesStatusBtn');
+        const modalCompareAndGenerateButton = document.getElementById('modalCompareAndGenerateButton');
+        const modalLinkCorrectionsBtn = document.getElementById('modalLinkCorrectionsBtn');
+        const modalListExclusionsBtn = document.getElementById('modalListExclusionsBtn');
+        const controlsColumn = document.getElementById('controls-column'); 
+        const windowStackingToggle = document.getElementById('windowStackingToggle');
+        const defaultShowRevertToggle = document.getElementById('defaultShowRevertToggle');
+        const unpinOnCloseToggle = document.getElementById('unpinOnCloseToggle');
+        const gridWrapper = document.getElementById('main-grid-wrapper');
+        const layoutBtn = document.getElementById('bottomBarLayoutBtn');
+        const toggleRevertControlsBtn = document.getElementById('toggleRevertControlsBtn');
+        const linkCorrectionsBtn = document.getElementById('linkCorrectionsBtn');
+        const linkedCorrectionsPreview = document.getElementById('linkedCorrectionsPreview');
+        const exclusionListModal = document.getElementById('exclusionListModal');
+        const exclusionListModalTitle = document.getElementById('exclusionListModalTitle');
+        const exclusionListModalContent = document.getElementById('exclusionListModalContent');
+        const exclusionListModalCloseBtn = document.getElementById('exclusionListModalCloseBtn');
+        const exclusionListModalConfirmBtn = document.getElementById('exclusionListModalConfirmBtn');
+        const audioOnlyModeCheckbox = document.getElementById('audioOnlyModeCheckbox');
+		const previewSubtitleBtn = document.getElementById('previewSubtitleBtn'); // [大師級修正]
+        const minimizePlayerBtn = document.getElementById('minimizePlayerBtn');
+        const globalPauseBtn = document.getElementById('globalPauseBtn');
+		const rewindBtn = document.getElementById('rewindBtn'); // [新功能]
+		const forwardBtn = document.getElementById('forwardBtn'); // [新功能]
+		const mainSecondaryActions = document.getElementById('main-secondary-actions'); // UX PRO FIX: Get the secondary actions group
+
+        let correctedSubtitle = "", lastCalculatedParams = null, appliedCorrectionsData = {}, totalCorrectionsCount = 0;
+        let isWindowStackingEnabled = false, isDefaultShowRevertEnabled = false, modalStack = []; 
+        let currentPlayer = { player: null, type: null, isReady: false, isPlaying: false }; 
+        let currentParsedSubs = [], followInterval = null, lastActiveLineIndex = -1;
+        let isDragging = false, dragStartX, dragStartY, initialLeft, initialTop;
+        let globallyArchivedRules = new Set();
+        let revertControlsVisible = true;
+        let overriddenExclusionHits = new Set();
+        
+        function saveSettings() { isWindowStackingEnabled = windowStackingToggle.checked; isDefaultShowRevertEnabled = defaultShowRevertToggle.checked; localStorage.setItem('windowStackingEnabled', isWindowStackingEnabled); localStorage.setItem('defaultShowRevert', isDefaultShowRevertEnabled); }
+        function loadSettings() { if(!windowStackingToggle || !defaultShowRevertToggle) return; const stackingEnabled = localStorage.getItem('windowStackingEnabled') === 'true'; isWindowStackingEnabled = stackingEnabled; windowStackingToggle.checked = stackingEnabled; const defaultShowRevert = localStorage.getItem('defaultShowRevert') === 'true'; isDefaultShowRevertEnabled = defaultShowRevert; defaultShowRevertToggle.checked = defaultShowRevert; revertControlsVisible = isDefaultShowRevertEnabled; }
+        function toggleDarkMode(isDark) { body.classList.toggle('dark-mode', isDark); darkModeToggleBtn.textContent = isDark ? '☀️' : '🌙'; localStorage.setItem('theme', isDark ? 'dark' : 'light'); }
+        function loadTheme() { const preferredTheme = localStorage.getItem('theme'); if(preferredTheme) { toggleDarkMode(preferredTheme === 'dark'); } else { toggleDarkMode(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } }
+        function openModal(modalElement) { if(!modalElement) return; if (isWindowStackingEnabled && modalStack.length > 0) { const currentTopModal = modalStack[modalStack.length - 1]; if(currentTopModal !== modalElement) { currentTopModal.style.display = 'none'; } } else { closeAllModals(); } if (modalStack[modalStack.length - 1] !== modalElement) { modalStack.push(modalElement); } modalElement.style.display = 'flex'; }
+        function closeModal(modalElement) { if (!modalElement || modalElement.style.display === 'none') return; modalElement.style.display = 'none'; if (modalStack.length > 0 && modalStack[modalStack.length - 1] === modalElement) { modalStack.pop(); } if (isWindowStackingEnabled && modalStack.length > 0) { const previousModal = modalStack[modalStack.length - 1]; previousModal.style.display = 'flex'; } else if (!isWindowStackingEnabled) { closeAllModals(); } }
+        function closeAllModals() { [correctionModal, ruleManagementModal, newRuleModal, addedRulesModal, videoSettingsModal, correctionManagementModal, exclusionListModal].forEach(m => { if(m) m.style.display = 'none' }); modalStack = []; }
+        function getYouTubeVideoId(url) { const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/; const match = url.match(regExp); return (match && match[2].length === 11) ? match[2] : null; }
+        
+		function updatePlayPauseIcons(isPlaying) {
+			currentPlayer.isPlaying = isPlaying;
+			const icon = isPlaying ? '⏸️' : '▶️';
+			if (globalPauseBtn) {
+				globalPauseBtn.textContent = icon;
+				// [新功能] 同步顯示/隱藏新按鈕
+				const displayStyle = (currentPlayer.player && currentPlayer.isReady) ? 'inline-flex' : 'none';
+				globalPauseBtn.style.display = displayStyle;
+				if(rewindBtn) rewindBtn.style.display = displayStyle;
+				if(forwardBtn) forwardBtn.style.display = displayStyle;
+			}
+		}
+        
+        function onPlayerStateChange(event) {
+            const isPlaying = event.data == YT.PlayerState.PLAYING;
+            updatePlayPauseIcons(isPlaying);
+            if (isPlaying) { 
+                startFollow(); 
+            } else { 
+                stopFollow(); 
+            } 
+        }
+
+        function onPlayerReady(event) { currentPlayer.isReady = true; }
+        
+        function cleanupCurrentPlayer(forceFullCleanup = false) { 
+            if (!forceFullCleanup && videoKeepPlayingOnCloseToggle.checked && floatingVideoContainer.style.display === 'none') { return; } 
+            if (currentPlayer.player) { 
+                if (currentPlayer.type === 'youtube' && typeof currentPlayer.player.destroy === 'function') { 
+                    currentPlayer.player.destroy(); 
+                } else if (currentPlayer.type === 'local') { 
+                    currentPlayer.player.removeEventListener('play', startFollow); 
+                    currentPlayer.player.removeEventListener('pause', stopFollow); 
+                    currentPlayer.player.removeEventListener('ended', stopFollow);
+                    currentPlayer.player.removeEventListener('play', () => updatePlayPauseIcons(true));
+                    currentPlayer.player.removeEventListener('pause', () => updatePlayPauseIcons(false));
+                    currentPlayer.player.removeEventListener('ended', () => updatePlayPauseIcons(false));
+                    if (forceFullCleanup || (!videoKeepPlayingOnCloseToggle.checked && videoReleaseMemoryOnCloseToggle.checked && floatingVideoContainer.style.display === 'none')) { 
+                        if (currentPlayer.player.src && currentPlayer.player.src.startsWith('blob:')) { URL.revokeObjectURL(currentPlayer.player.src); } 
+                    } 
+                } 
+            } 
+            playerContainer.innerHTML = '<div style="width: 100%; height: 100%; background: #222; display:flex; align-items:center; justify-content:center; color: #888;">請載入影片</div>'; 
+            currentPlayer = { player: null, type: null, isReady: false, isPlaying: false }; 
+			if (globalPauseBtn) {
+				globalPauseBtn.style.display = 'none'; 
+				if(rewindBtn) rewindBtn.style.display = 'none'; // [新功能]
+				if(forwardBtn) forwardBtn.style.display = 'none'; // [新功能]
+			}
+            updatePlayPauseIcons(false);
+        }
+        
+        function loadVideo() { 
+            cleanupCurrentPlayer(true); 
+            const url = videoUrlInput.value.trim(); 
+            const videoId = getYouTubeVideoId(url); 
+            if (videoId) { 
+                playerContainer.innerHTML = '<div id="yt-player-container-inner"></div>'; 
+                currentPlayer.player = new YT.Player('yt-player-container-inner', { height: '100%', width: '100%', videoId: videoId, playerVars: { 'playsinline': 1 }, events: { 'onReady': onPlayerReady, 'onStateChange': onPlayerStateChange } }); 
+                currentPlayer.type = 'youtube'; 
+                floatingVideoContainer.style.display = 'flex'; 
+                toggleVideoPlayerCheckbox.checked = true;
+				updatePlayPauseIcons(false); // [新功能] 統一呼叫此函式來顯示所有按鈕
+                if (audioOnlyModeCheckbox.checked) setAudioOnlyMode(true);
+            } else { 
+                localVideoFile.click(); 
+            } 
+        }
+        
+        function loadLocalVideo(event) { 
+            cleanupCurrentPlayer(true); 
+            const file = event.target.files[0]; if (!file) return; 
+            const videoElement = document.createElement('video'); 
+            videoElement.id = 'local-player'; 
+            videoElement.controls = true; 
+            videoElement.src = URL.createObjectURL(file); 
+            playerContainer.appendChild(videoElement); 
+            currentPlayer.player = videoElement; 
+            currentPlayer.type = 'local'; 
+            currentPlayer.isReady = true; 
+            videoElement.addEventListener('play', startFollow); 
+            videoElement.addEventListener('pause', stopFollow); 
+            videoElement.addEventListener('ended', stopFollow); 
+            videoElement.addEventListener('play', () => updatePlayPauseIcons(true));
+            videoElement.addEventListener('pause', () => updatePlayPauseIcons(false));
+            videoElement.addEventListener('ended', () => updatePlayPauseIcons(false));
+            
+            const fileName = file.name.length > 30 ? file.name.substring(0, 27) + '...' : file.name; 
+            syncUrls(null, `本地檔案: ${fileName}`); 
+            floatingVideoContainer.style.display = 'flex'; 
+            toggleVideoPlayerCheckbox.checked = true; 
+            updatePlayPauseIcons(false); // [新功能] 統一呼叫此函式來顯示所有按鈕
+            if (audioOnlyModeCheckbox.checked) setAudioOnlyMode(true);
+            event.target.value = null; 
+        }
+
+        function seekAndPlay(seconds) { if (!currentPlayer.player || !currentPlayer.isReady || floatingVideoContainer.style.display === 'none') { console.warn("Player not loaded/ready or hidden. Cannot seek."); return; } if (currentPlayer.type === 'youtube' && typeof currentPlayer.player.seekTo === 'function') { currentPlayer.player.seekTo(seconds, true); currentPlayer.player.playVideo(); } else if (currentPlayer.type === 'local') { currentPlayer.player.currentTime = seconds; currentPlayer.player.play(); } }
+		// [新功能] 影片時間跳轉函式
+		function seekVideo(seconds) {
+			if (!currentPlayer.player || !currentPlayer.isReady || floatingVideoContainer.style.display === 'none') {
+				console.warn("Player not loaded/ready or hidden. Cannot seek.");
+				return;
+			}
+			if (currentPlayer.type === 'youtube' && typeof currentPlayer.player.seekTo === 'function') {
+				const currentYTTime = currentPlayer.player.getCurrentTime() || 0;
+				currentPlayer.player.seekTo(currentYTTime + seconds, true);
+			} else if (currentPlayer.type === 'local') {
+				currentPlayer.player.currentTime += seconds;
+			}
+		}
+        function startDrag(e) { if (e.target.closest('button') || body.classList.contains('video-pinned') || body.classList.contains('audio-mode-active')) return; isDragging = true; const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX; const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY; dragStartX = clientX; dragStartY = clientY; initialLeft = floatingVideoContainer.offsetLeft; initialTop = floatingVideoContainer.offsetTop; document.addEventListener('mousemove', onDragMove); document.addEventListener('touchmove', onDragMove, { passive: false }); document.addEventListener('mouseup', onDragEnd); document.addEventListener('touchend', onDragEnd); }
+        function onDragMove(e) { if (!isDragging) return; e.preventDefault(); const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX; const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY; const dx = clientX - dragStartX; const dy = clientY - dragStartY; floatingVideoContainer.style.left = `${initialLeft + dx}px`; floatingVideoContainer.style.top = `${initialTop + dy}px`; }
+        function onDragEnd() { isDragging = false; document.removeEventListener('mousemove', onDragMove); document.removeEventListener('touchmove', onDragMove); document.removeEventListener('mouseup', onDragEnd); document.removeEventListener('touchend', onDragEnd); }
+        
+        function setAudioOnlyMode(isActive) {
+            audioOnlyModeCheckbox.checked = isActive;
+            floatingVideoContainer.classList.toggle('audio-only-mode', isActive);
+            body.classList.toggle('audio-mode-active', isActive);
+
+            if (isActive) {
+                if (pinVideoPlayerCheckbox.checked) {
+                    setPlayerPinned(false);
+                }
+                minimizePlayerBtn.textContent = '🗖';
+                minimizePlayerBtn.title = '還原為影音模式';
+            } else {
+                minimizePlayerBtn.textContent = '—';
+                minimizePlayerBtn.title = '最小化為音訊模式';
+            }
+        }
+        
+        function setPlayerPinned(isPinned) { 
+            pinVideoPlayerCheckbox.checked = isPinned; 
+            pinVideoBtn.classList.toggle('active', isPinned); 
+            body.classList.toggle('video-pinned', isPinned);
+            
+            if (isPinned && audioOnlyModeCheckbox.checked) {
+                setAudioOnlyMode(false);
+            }
+
+            if (isPinned) {
+                floatingVideoContainer.style.left = '';
+                floatingVideoContainer.style.top = '';
+                floatingVideoContainer.style.width = '';
+                floatingVideoContainer.style.height = '';
+            } else if (!audioOnlyModeCheckbox.checked) {
+                floatingVideoContainer.style.left = '2rem'; 
+                floatingVideoContainer.style.top = '2rem';
+                floatingVideoContainer.style.width = '480px';
+                floatingVideoContainer.style.height = '270px';
+            }
+        }
+        function syncUrls(sourceElement, forcedValue = null) { let url = forcedValue !== null ? forcedValue : (sourceElement ? sourceElement.value : ''); if (url.startsWith('本地檔案:')) { if (videoUrlInput.value !== url) videoUrlInput.value = url; return; } const videoId = getYouTubeVideoId(url); const cleanUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : url; if (videoUrlInput.value !== cleanUrl) videoUrlInput.value = cleanUrl; }
+        function readFile(file, textarea, callback) { if (file) { const reader = new FileReader(); reader.onload = (e) => { textarea.value = e.target.result; if(callback) callback(); }; reader.readAsText(file, 'UTF-8'); } }
+        function downloadFile(content, fileName, contentType) { const blob = new Blob([content], { type: contentType }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }
+        function escapeRegExp(string) { return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+        function getFileName(fileInput, defaultName) { return fileInput.files[0] ? fileInput.files[0].name : defaultName; }
+        function timeToMs(timeStr) { if (!timeStr) return 0; let isNegative = false; if (timeStr.startsWith('-')) { isNegative = true; timeStr = timeStr.substring(1); } const parts = timeStr.split(/[:,]/); if (parts.length !== 4) return 0; const [hh, mm, ss, ms] = parts.map(Number); const totalMs = (hh * 3600 + mm * 60 + ss) * 1000 + ms; return isNegative ? -totalMs : totalMs; }
+        function parseFlexibleTimestamp(timeStr) { if (!timeStr) return NaN; timeStr = timeStr.trim().replace(',', '.'); const timeParts = timeStr.split(':'); let hh = 0, mm = 0, ss_ms; if (timeParts.length === 3) { hh = parseFloat(timeParts[0]); mm = parseFloat(timeParts[1]); ss_ms = timeParts[2]; } else if (timeParts.length === 2) { mm = parseFloat(timeParts[0]); ss_ms = timeParts[1]; } else if (timeParts.length === 1) { ss_ms = timeParts[0]; } else { return NaN; } const [ss, ms_str] = (ss_ms || "0").split('.'); const ms = parseInt((ms_str || "0").padEnd(3, '0').substring(0, 3), 10); const totalMs = (hh * 3600 + mm * 60 + parseFloat(ss)) * 1000 + ms; return isNaN(totalMs) ? NaN : Math.round(totalMs); }
+        function msToTime(ms, showSign = false) { const sign = ms < 0 ? '-' : (showSign ? '+' : ''); ms = Math.abs(Math.round(ms)); const hh = Math.floor(ms / 3600000); ms %= 3600000; const mm = Math.floor(ms / 60000); ms %= 60000; const ss = Math.floor(ms / 1000); ms %= 1000; const pad = (num, len) => String(num).padStart(len, '0'); return `${sign}${pad(hh, 2)}:${pad(mm, 2)}:${pad(ss, 2)},${pad(ms, 3)}`; }
+        function scrollToElement(element, blockPosition = 'start') { if (element) { element.scrollIntoView({ behavior: 'smooth', block: blockPosition }); } }
+        function handleSubtitleTextChange() { currentParsedSubs = parseSubtitle(subtitleText.value); autoPopulateTimelineFields(); }
+        function detectCorrectionFormat(text) { const trimmedText = text.trim(); if (trimmedText.includes("-<") && trimmedText.includes("[") && trimmedText.includes("]>")) { return 'new'; } if (trimmedText.includes("- 原始字幕內容：") || trimmedText.includes("- 建議修正內容：")) { return 'old'; } return 'unknown'; }
+        let isUpdatingCutFields = false;
+        function autoPopulateTimelineFields() { const parsedData = currentParsedSubs; if (isUpdatingCutFields || !originalStartInput) return; if (parsedData.length > 0) { const firstItem = parsedData[0]; const lastItem = parsedData[parsedData.length - 1]; const firstStartTimeSrt = (firstItem.originalFormat === 'formatSrt') ? firstItem.start : vttLikeTimeToSrt(firstItem.start); const lastEndTimeSrt = (lastItem.originalFormat === 'formatSrt') ? lastItem.end : vttLikeTimeToSrt(lastItem.end); originalStartInput.value = firstStartTimeSrt; originalEndInput.value = lastEndTimeSrt; cutStartInput.value = '00:00:00,000'; cutEndInput.value = lastEndTimeSrt; cutStartLineInput.value = 1; cutEndLineInput.value = parsedData.length; cutEndLineInput.max = parsedData.length; cutStartLineInput.max = parsedData.length; } else { const defaultTime = '00:00:00,000'; originalStartInput.value = defaultTime; originalEndInput.value = defaultTime; cutStartInput.value = defaultTime; cutEndInput.value = defaultTime; cutStartLineInput.value = 1; cutEndLineInput.value = 1; } }
+        window.openTab = function(evt, tabName) { const parent = evt.currentTarget.closest('.accordion-content'); parent.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active')); parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); parent.querySelector('#' + tabName).classList.add('active'); evt.currentTarget.classList.add('active'); }
+        function adjustSubtitleTime(parsedData, timeShiftMs, speedFactor) { if (isNaN(timeShiftMs) || isNaN(speedFactor) || speedFactor <= 0) { alert("時間偏移或速率因子無效。"); return null; } const adjustedData = JSON.parse(JSON.stringify(parsedData)); const timeParser = (ts, format) => (format === 'formatSrt' ? timeToMs(ts) : timeToMs(vttLikeTimeToSrt(ts))); adjustedData.forEach(item => { let startMs = timeParser(item.start, item.originalFormat); let endMs = timeParser(item.end, item.originalFormat); startMs = (startMs / speedFactor) + timeShiftMs; endMs = (endMs / speedFactor) + timeShiftMs; let newStartStr = msToTime(startMs); let newEndStr = msToTime(endMs); if(item.originalFormat === 'formatVttLike') { newStartStr = srtTimeToVttLike(newStartStr); newEndStr = srtTimeToVttLike(newEndStr); } item.start = newStartStr; item.end = newEndStr; }); return adjustedData; }
+        function getAdjustedSubtitle() { const parsedData = currentParsedSubs; if (parsedData.length === 0) { alert("無法解析上方字幕內容。"); return null; } const timeShiftMs = timeToMs(timeShiftInput.value); const speedFactor = parseFloat(speedFactorDirectInput.value); const adjustedData = adjustSubtitleTime(parsedData, timeShiftMs, speedFactor); if (adjustedData) return { content: rebuildSubtitle(adjustedData) }; return null; }
+        function getSyncedSubtitle() { const speedFactorSyncInput = document.getElementById('speedFactorSync'); if (!lastCalculatedParams || !speedFactorSyncInput) { alert("請先計算同步參數。"); return null; } const parsedData = currentParsedSubs; if (parsedData.length === 0) { alert("無法解析上方字幕內容。"); return null; } const finalSpeedFactor = parseFloat(speedFactorSyncInput.value); const adjustedData = adjustSubtitleTime(parsedData, lastCalculatedParams.timeShift, finalSpeedFactor); if(adjustedData) return { content: rebuildSubtitle(adjustedData) }; return null; }
+        function getCutSubtitle() { const parsedData = currentParsedSubs; if (parsedData.length === 0) { alert("無法解析上方字幕內容。"); return null; } const startLine = parseInt(cutStartLineInput.value, 10); const endLine = parseInt(cutEndLineInput.value, 10); if (isNaN(startLine) || isNaN(endLine) || startLine < 1 || startLine > endLine || endLine > parsedData.length) { alert("請輸入有效的起始和結束行號。"); return null; } const cutData = parsedData.slice(startLine - 1, endLine); if (cutData.length === 0) { alert("在指定的行號範圍內未找到任何字幕。"); return null; } const firstItem = cutData[0]; const timeOffsetMs = -timeToMs((firstItem.originalFormat === 'formatSrt') ? firstItem.start : vttLikeTimeToSrt(firstItem.start)); const shiftedData = cutData.map((item, index) => { const newItem = JSON.parse(JSON.stringify(item)); const timeParser = (ts, format) => (format === 'formatSrt' ? timeToMs(ts) : timeToMs(vttLikeTimeToSrt(ts))); let startMs = timeParser(newItem.start, newItem.originalFormat) + timeOffsetMs; let endMs = timeParser(newItem.end, newItem.originalFormat) + timeOffsetMs; startMs = Math.max(0, startMs); endMs = Math.max(0, endMs); let newStartStr = msToTime(startMs); let newEndStr = msToTime(endMs); if (newItem.originalFormat === 'formatVttLike') { newStartStr = srtTimeToVttLike(newStartStr); newEndStr = srtTimeToVttLike(newEndStr); } newItem.start = newStartStr; newItem.end = newEndStr; newItem.index = index + 1; return newItem; }); return { content: rebuildSubtitle(shiftedData), count: shiftedData.length, startLine, endLine }; }
+        function getMergedSubtitle() { const subText1 = mergeFile1Content.value.trim(); const subText2 = mergeFile2Content.value.trim(); if (!subText1) { alert('檔案1中沒有內容可供合併。'); return null; } if (!subText2) { const parsedData1 = parseSubtitle(subText1); if (parsedData1.length === 0) { alert('無法解析檔案1的字幕格式。'); return null; } return { content: rebuildSubtitle(parsedData1), count: parsedData1.length }; } const parsedData1 = parseSubtitle(subText1); const parsedData2 = parseSubtitle(subText2); if (parsedData1.length === 0) { alert('無法解析檔案1的字幕格式。'); return null; } if (parsedData2.length === 0) { alert('無法解析檔案2的字幕格式。'); return null; } const lastItem1 = parsedData1[parsedData1.length - 1]; const lastEndTimeSrt = lastItem1.originalFormat === 'formatSrt' ? lastItem1.end : vttLikeTimeToSrt(lastItem1.end); const offsetMs = timeToMs(lastEndTimeSrt); if (offsetMs < 0) { alert('檔案1的結束時間無效。'); return null; } const timeParser = (ts, format) => (format === 'formatSrt' ? timeToMs(ts) : timeToMs(vttLikeTimeToSrt(ts))); const shiftedData2 = parsedData2.map(item => { const newItem = JSON.parse(JSON.stringify(item)); let startMs = timeParser(item.start, item.originalFormat) + offsetMs; let endMs = timeParser(item.end, item.originalFormat) + offsetMs; let newStartStr = msToTime(startMs); let newEndStr = msToTime(endMs); if (newItem.originalFormat === 'formatVttLike') { newStartStr = srtTimeToVttLike(newStartStr); newEndStr = srtTimeToVttLike(newEndStr); } newItem.start = newStartStr; newItem.end = newEndStr; return newItem; }); const combinedData = [...parsedData1, ...shiftedData2].map((item, index) => { item.index = index + 1; item.targetFormat = parsedData1[0].originalFormat; if (item.targetFormat === 'formatSrt') { if (item.originalFormat === 'formatVttLike') { item.start = vttLikeTimeToSrt(item.start); item.end = vttLikeTimeToSrt(item.end); } } else { if (item.originalFormat === 'formatSrt') { item.start = srtTimeToVttLike(item.start); item.end = srtTimeToVttLike(item.end); } } return item; }); return { content: rebuildSubtitle(combinedData), count: combinedData.length }; }
+        function toggleAddMergeButton() { const hasText1 = mergeFile1Content.value.trim().length > 0; const hasText2 = mergeFile2Content.value.trim().length > 0; if(addAndMergeBtn) addAndMergeBtn.style.display = (hasText1 && hasText2) ? 'inline-block' : 'none'; }
+        function srtTimeToVttLike(timeStr) { if(!timeStr) return "00:00.000"; const [hms, ms] = timeStr.split(','); const [h, m, s] = hms.split(':').map(Number); const totalMinutes = h * 60 + m; return `${String(totalMinutes).padStart(2, '0')}:${String(s).padStart(2, '0')}.${ms}`; }
+        function vttLikeTimeToSrt(timeStr) { if(!timeStr) return "00:00:00,000"; const [main, ms] = timeStr.replace(',', '.').split('.'); const parts = main.split(':').map(Number); let h = 0, m = 0, s = 0; if (parts.length === 3) { [h, m, s] = parts; } else if (parts.length === 2) { const totalMinutes = parts[0]; h = Math.floor(totalMinutes / 60); m = totalMinutes % 60; s = parts[1]; } else { s = parts[0]; } const pad = (num) => String(num).padStart(2, '0'); return `${pad(h)}:${pad(m)}:${pad(s)},${(ms || '0').padEnd(3, '0')}`; }
+        function convertOldToNewFormat(text) { const { map } = parseOldCorrectionFormat(text, false); const newFormatLines = []; for (const original in map) { newFormatLines.push(`-<${original}[${map[original] === null ? '' : map[original]}]>`); } return newFormatLines.join('\n'); }
+        function convertNewToOldFormat(text) { const { map } = parseNewCorrectionFormat(text, false); const oldFormatLines = []; for (const original in map) { const rule = map[original]; let correctedText; if (rule.replacement === null) { correctedText = '(保留原樣)'; } else { correctedText = rule.replacement; } oldFormatLines.push(`- 原始字幕內容：${original}`); oldFormatLines.push(`- 建議修正內容：${correctedText}`); } return oldFormatLines.join('\n'); }
+        function findBestDiff(originalLine, correctedLine) { let start = 0; while (start < originalLine.length && start < correctedLine.length && originalLine[start] === correctedLine[start]) { start++; } let oldEnd = originalLine.length; let newEnd = correctedLine.length; while (oldEnd > start && newEnd > start && originalLine[oldEnd - 1] === correctedLine[newEnd - 1]) { oldEnd--; newEnd--; } const originalDiff = originalLine.substring(start, oldEnd); const correctedDiff = correctedLine.substring(start, newEnd); const CONTEXT_LENGTH = 1; if (originalDiff.length > 0 && originalDiff.length <= CONTEXT_LENGTH) { const expandedStart = Math.max(0, start - CONTEXT_LENGTH); const expandedOldEnd = Math.min(originalLine.length, oldEnd + CONTEXT_LENGTH); const expandedNewEnd = Math.min(correctedLine.length, newEnd + CONTEXT_LENGTH); const finalOriginal = originalLine.substring(expandedStart, expandedOldEnd); const finalCorrected = correctedLine.substring(expandedStart, expandedNewEnd); if (finalOriginal !== finalCorrected) { return { original: finalOriginal, corrected: finalCorrected }; } } return { original: originalDiff, corrected: correctedDiff }; }
+        // 請將舊的 generateCorrectionRules 函式完整替換為以下新版本
+        function generateCorrectionRules(originalSubText, correctedSubText) {
+            const originalParsed = parseSubtitle(originalSubText);
+            const correctedParsed = parseSubtitle(correctedSubText);
+
+            if (originalParsed.length === 0 || correctedParsed.length === 0) {
+                alert('無法解析一個或兩個字幕檔，請檢查格式。');
+                return;
+            }
+
+            // [大師級修正 2] 使用更強大的資料結構來合併規則與其對應的行號
+            const consolidatedRules = new Map(); // Key: "original->corrected", Value: Set of line numbers
+
+            const lengthsMatch = originalParsed.length === correctedParsed.length;
+            if (!lengthsMatch) {
+                alert(`字幕行數不匹配 (原始: ${originalParsed.length}, 修正後: ${correctedParsed.length})。\n將僅比對時間碼相同的行。`);
+            }
+
+            const correctedMapByTime = new Map(correctedParsed.map(item => [item.start, item]));
+
+            originalParsed.forEach((originalItem, index) => {
+                let correctedItem = correctedMapByTime.get(originalItem.start);
+
+                // [大師級修正 1] 當時間戳不匹配但行數相同時，降級為使用索引進行比對
+                if (!correctedItem && lengthsMatch) {
+                    correctedItem = correctedParsed[index];
+                }
+                
+                if (correctedItem && originalItem.text.trim() !== correctedItem.text.trim()) {
+                    const originalText = originalItem.text.trim();
+                    const correctedText = correctedItem.text.trim();
+                    const diff = findBestDiff(originalText, correctedText);
+
+                    if (diff.original && diff.original !== diff.corrected) {
+                        // [大師級修正 2] 將規則與行號進行合併
+                        const ruleKey = `${diff.original}->${diff.corrected}`;
+                        if (!consolidatedRules.has(ruleKey)) {
+                            consolidatedRules.set(ruleKey, new Set());
+                        }
+                        consolidatedRules.get(ruleKey).add(parseInt(originalItem.index, 10));
+                    }
+                }
+            });
+
+            // [大師級修正 2] 生成帶有精準行號的規則字串
+            const outputLines = [];
+            for (const [ruleKey, lineNumbersSet] of consolidatedRules.entries()) {
+                const [original, corrected] = ruleKey.split('->');
+                const lineNumbers = Array.from(lineNumbersSet).sort((a,b) => a-b).join(',');
+                
+                // 產生帶有行號限定的格式: -<原文[修正文]||行號>
+                outputLines.push(`-<${original}[${corrected}]||${lineNumbers}>`);
+            }
+            
+            if (outputLines.length > 0) {
+                correctionText.value = outputLines.join('\n');
+                alert(`比對完成！共生成 ${outputLines.length} 條限定行號的修正規則。`);
+                scrollToElement(correctionText);
+            } else {
+                alert('比對完成，未發現任何文本差異。');
+                correctionText.value = '';
+            }
+        }
+        function detectSubtitleFormat(text) { const lines = text.trim().split('\n').filter(Boolean); if (lines.length === 0) return 'unknown'; if (lines[0].trim().startsWith('[') && lines[0].includes('-->')) return 'formatVttLike'; const srtRegex = /^\d{2}:\d{2}:\d{2},\d{3} --> \d{2}:\d{2}:\d{2},\d{3}$/; if (/^\d+$/.test(lines[0]) && lines[1] && srtRegex.test(lines[1].trim())) return 'formatSrt'; return 'unknown'; }
+        function parseSubtitle(text) { const format = detectSubtitleFormat(text); const parsed = []; if (format === 'formatSrt') { text.trim().split(/\n\s*\n/).forEach(block => { const lines = block.split('\n'); const timeMatch = lines[1]?.match(/(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})/); if (lines[0]?.match(/^\d+$/) && timeMatch) { parsed.push({ index: lines[0], start: timeMatch[1], end: timeMatch[2], text: lines.slice(2).join('\n'), originalFormat: 'formatSrt' }); } }); } else if (format === 'formatVttLike') { const lineRegex = /\[(.*?) --> (.*?)\]\s*(.*)/s; text.trim().split('\n').forEach((line, index) => { const match = line.match(lineRegex); if(match) { parsed.push({ index: index + 1, start: match[1].trim(), end: match[2].trim(), text: match[3].trim(), originalFormat: 'formatVttLike' }); } }); } return parsed; };
+        function rebuildSubtitle(parsedData) { if (!parsedData || parsedData.length === 0) return ""; const formatToBuild = parsedData[0].targetFormat || parsedData[0].originalFormat; const blocks = parsedData.map(item => { if(formatToBuild === 'formatSrt') { return `${item.index}\n${item.start} --> ${item.end}\n${item.text}`; } else { return `[${item.start} --> ${item.end}] ${item.text}`; } }); const separator = formatToBuild === 'formatSrt' ? '\n\n' : '\n'; return blocks.join(separator); };
+		// [新功能] 將內部解析的字幕資料轉換為 YouTube 相容的 VTT 格式
+		function convertToYouTubeVtt(parsedData) {
+			if (!parsedData || parsedData.length === 0) return "";
+			
+			const blocks = parsedData.map(item => {
+				// 確保時間戳是 SRT 格式 (HH:MM:SS,ms)，因為 msToTime 函式就是這個格式
+				const startSrt = (item.originalFormat === 'formatSrt' || !item.originalFormat) ? item.start : vttLikeTimeToSrt(item.start);
+				const endSrt = (item.originalFormat === 'formatSrt' || !item.originalFormat) ? item.end : vttLikeTimeToSrt(item.end);
+				
+				// 將 SRT 的逗號換成 VTT 的句點
+				const startVtt = startSrt.replace(',', '.');
+				const endVtt = endSrt.replace(',', '.');
+				
+				return `${startVtt} --> ${endVtt}\n${item.text}`;
+			});
+			
+			// YouTube VTT 需要一個 WEBVTT 檔頭
+			return "WEBVTT\n\n" + blocks.join('\n\n');
+		}
+        function parseOldCorrectionFormat(text, shouldRemoveBrackets) { const corrections = {}; const lines = text.split('\n').filter(Boolean); const originalPrefix = '- 原始字幕內容：'; const correctedPrefix = '- 建議修正內容：'; for (let i = 0; i < lines.length - 1; i++) { if (lines[i].startsWith(originalPrefix) && lines[i + 1].startsWith(correctedPrefix)) { const originalText = lines[i].substring(originalPrefix.length).trim(); let correctedText = lines[i + 1].substring(correctedPrefix.length).trim(); if (correctedText === "(保留原樣)") { correctedText = null; } else if (shouldRemoveBrackets) { correctedText = correctedText.replace(/（[^）]*）/g, '').replace(/\([^\)]*\)/g, '').trim(); } originalText.split(',').map(o => o.trim()).filter(Boolean).forEach(o => { corrections[o] = correctedText; }); i++; } } return { map: corrections }; };
+        function parseNewCorrectionFormat(text, shouldRemoveBrackets) { const corrections = {}; const ruleRegex = /-<(.*?)\[(.*?)\](?:\|(.*))?>/s; const lineNumRegex = /^[\d\s,]*$/; text.split('\n').forEach(line => { const match = line.trim().match(ruleRegex); if (match) { const original = match[1].trim(); let corrected = match[2].trim(); const extras = match[3] || ''; if (shouldRemoveBrackets) { corrected = corrected.replace(/（[^）]*）/g, '').replace(/\([^\)]*\)/g, '').trim(); } if (original) { const parts = extras.split('|').map(p => p.trim()); let exclusionsStr = ''; let lineNumbersStr = ''; if (parts.length === 2) { exclusionsStr = parts[0]; lineNumbersStr = parts[1]; } else if (parts.length === 1 && parts[0]) { if (lineNumRegex.test(parts[0])) { lineNumbersStr = parts[0]; } else { exclusionsStr = parts[0]; } } const exclusions = exclusionsStr ? exclusionsStr.split(',').map(e => e.trim()).filter(Boolean) : []; const lineNumbers = lineNumbersStr ? lineNumbersStr.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n)) : []; corrections[original] = { replacement: corrected === '' ? null : corrected, exclusions: exclusions, lineNumbers: lineNumbers }; } } }); return { map: corrections }; };
+        function parseCorrection(text, shouldRemoveBrackets) { const newMap = parseNewCorrectionFormat(text, shouldRemoveBrackets).map; if (Object.keys(newMap).length > 0) return newMap; const oldMap = parseOldCorrectionFormat(text, shouldRemoveBrackets).map; const compatibleMap = {}; for (const key in oldMap) { compatibleMap[key] = { replacement: oldMap[key], exclusions: [], lineNumbers: [] }; } return compatibleMap; };
+		// [大師級修正 V3] 增強 applyCorrections，使其能接收並反映當前的UI取消狀態
+		function applyCorrections(parsedData, correctionMap, cancellationStatus = {}) {
+			let outputLogHTML = '';
+			let correctionCount = 0;
+			const appliedCorrections = {};
+			
+			// 呼叫統一的核心引擎，並傳入從UI收集到的最新狀態
+			const engineResult = buildFinalCorrectedText(parsedData, correctionMap, cancellationStatus);
+			
+			const modifiedData = engineResult.modifiedData;
+			const allChangesByLine = engineResult.changesByLine;
+			const ruleTotalCounts = engineResult.ruleTotalCounts;
+
+			// --- 以下的HTML生成邏輯保持不變，但現在它基於反映了UI狀態的engineResult ---
+			modifiedData.forEach(item => {
+				const itemIndexInt = parseInt(item.index, 10);
+				const changesOnThisLine = allChangesByLine[itemIndexInt];
+				
+				if (changesOnThisLine && changesOnThisLine.length > 0) {
+					correctionCount++;
+					const originalFullText = parsedData.find(p => parseInt(p.index, 10) === itemIndexInt).text;
+					
+					appliedCorrections[item.index] = {
+						originalText: originalFullText,
+						rulesApplied: changesOnThisLine.map(c => ({ from: c.from, to: c.to }))
+					};
+
+					const { original: diffOriginal, corrected } = diffStrings(originalFullText, item.text);
+
+					const rulesForTag = new Map();
+					changesOnThisLine.forEach(change => {
+						const ruleKey = `${change.from} -> ${change.to}`;
+						if (!rulesForTag.has(ruleKey)) {
+							rulesForTag.set(ruleKey, { from: change.from, to: change.to, indices: [] });
+						}
+						rulesForTag.get(ruleKey).indices.push(change.count);
+					});
+					
+					let countTagsHTML = '';
+					rulesForTag.forEach((ruleData, ruleKey) => {
+						const countStr = ruleData.indices.length === 1 ? ruleData.indices[0] : `${ruleData.indices[0]}-${ruleData.indices[ruleData.indices.length - 1]}`;
+						countTagsHTML += `<span class="count-tag" data-rule-key="${ruleKey}"><a class="interactive-rule-tag" href="#" data-rule-from="${ruleData.from}" data-rule-to="${ruleData.to}"><span class="from">${ruleData.from}</span> → <span class="to">${ruleData.to}</span>: <b class="rule-counts">${countStr}/${ruleTotalCounts[ruleData.from] || '?'}</b></a><span class="hidden-count"></span></span>`;
+					});
+
+					const allRuleKeysOnLine = Array.from(rulesForTag.keys());
+					const isAnyRuleArchived = allRuleKeysOnLine.some(key => globallyArchivedRules.has(key));
+					const allRuleKeysJSON = JSON.stringify(allRuleKeysOnLine);
+
+					outputLogHTML += `<div class="diff-line" data-item-index-line="${item.index}" data-archived="false" ${isAnyRuleArchived ? 'data-archived-by-rule="true"' : ''}>`;
+					outputLogHTML += `<div class="diff-header"><div class="diff-header-title-group"><b class="diff-header-title">修正字幕行 #${item.index}</b><label class="archive-rule-label"><input type="checkbox" class="archive-rule-checkbox" data-all-rule-keys='${allRuleKeysJSON}' ${isAnyRuleArchived ? 'checked' : ''}> 歸檔此規則</label></div><div class="diff-tags">${countTagsHTML}</div></div>`;
+					outputLogHTML += `<div class="diff-content"><span class="diff-label">- 原:</span> ${diffOriginal}<br><span class="diff-label">+ 修:</span> ${corrected}</div>`;
+					outputLogHTML += `<div class="revert-controls" style="display: none;">`;
+					
+					rulesForTag.forEach(rule => {
+						outputLogHTML += `<label><input type="checkbox" class="revert-instance" data-item-index="${item.index}" data-rule-original="${escapeRegExp(rule.from)}" data-rule-replacement="${encodeURIComponent(rule.to)}"> 取消此行修正: "${rule.from}" → "${rule.to}"</label>`;
+					});
+					outputLogHTML += `<hr style="border:0; border-top: 1px dashed var(--border-color); margin: 5px 0;">`;
+					rulesForTag.forEach(rule => {
+						outputLogHTML += `<label><input type="checkbox" class="revert-rule" data-rule-original="${escapeRegExp(rule.from)}"> 取消所有規則: "${rule.from}" → "${rule.to}"   <button class="add-rule-btn secondary" style="margin-top:0.5rem; font-size: 0.9em; padding: 0.25rem 0.5rem;">新增修正規則</button></label>`;
+					});
+					outputLogHTML += `</div></div>`;
+				}
+			});
+
+			return { modifiedData, outputLog: outputLogHTML || "未發現需要修正的內容。", correctionCount, appliedCorrections };
+		}
+        
+        // 輔助函式: 將 correctionMap 轉回文字，以便給計數函式使用
+        function rebuildCorrectionText(correctionMap) {
+            const lines = [];
+            for (const original in correctionMap) {
+                const rule = correctionMap[original];
+                const replacement = rule.replacement === null ? '' : rule.replacement;
+                const exclusions = rule.exclusions.join(',');
+                const lineNumbers = rule.lineNumbers.join(',');
+                lines.push(`-<${original}[${replacement}]|${exclusions}|${lineNumbers}>`);
+            }
+            return lines.join('\n');
+        }
+
+        // [大師終極融合版 V3] 這是最終的核心修正引擎
+        function buildFinalCorrectedText(originalParsedData, correctionMap, cancellationStatus) {
+            // 解構傳入的取消狀態，並提供預設值
+            const { globallyReverted = new Set(), instanceReverted = new Set(), overriddenExclusionHits = new Set() } = cancellationStatus;
+
+            const modifiedData = JSON.parse(JSON.stringify(originalParsedData));
+            const correctionKeys = Object.keys(correctionMap).sort((a, b) => b.length - a.length);
+            
+            const changesByLine = {}; // 用於記錄每行的具體變更
+            const ruleTotalCounts = {};
+            const ruleCurrentCounts = {};
+
+            // 步驟 1: 高效的全域計數，為後續修正做準備
+            correctionKeys.forEach(original => {
+                const rule = correctionMap[original];
+                if (!rule || rule.replacement === null) {
+                    ruleTotalCounts[original] = 0;
+                    return;
+                }
+                let totalMatches = 0;
+                originalParsedData.forEach(item => {
+                    const itemIndexInt = parseInt(item.index, 10);
+                    if (rule.lineNumbers && rule.lineNumbers.length > 0 && !rule.lineNumbers.includes(itemIndexInt)) return;
+                    
+                    let textToSearchOn = item.text;
+                    // 處理排除項的計數
+                    if (rule.exclusions && rule.exclusions.length > 0) {
+                        rule.exclusions.forEach(excl => {
+                             const hitKey = `${itemIndexInt}-${original}-${excl}`;
+                             // 如果排除項沒有被覆寫，才在計數時忽略它
+                            if (!overriddenExclusionHits.has(hitKey)) {
+                               textToSearchOn = textToSearchOn.replace(new RegExp(escapeRegExp(excl), 'g'), match => '\uFFFD'.repeat(match.length));
+                            }
+                        });
+                    }
+                    const matches = textToSearchOn.match(new RegExp(escapeRegExp(original), 'g'));
+                    if (matches) totalMatches += matches.length;
+                });
+                ruleTotalCounts[original] = totalMatches;
+                ruleCurrentCounts[original] = 0; // 初始化當前計數
+            });
+            
+            // 步驟 2: 遍歷每一行字幕，應用修正
+            modifiedData.forEach(item => {
+                const originalFullText = item.text;
+                const itemIndexInt = parseInt(item.index, 10);
+
+                let potentialChanges = [];
+                correctionKeys.forEach(original => {
+                    const rule = correctionMap[original];
+                    const ruleKey = `${original}->${rule.replacement}`;
+
+                    // 檢查取消狀態
+                    if (globallyReverted.has(original)) return;
+                    const instanceKey = `${itemIndexInt}-${original}->${rule.replacement}`;
+                    if (instanceReverted.has(instanceKey)) return;
+                    if (!rule || rule.replacement === null) return;
+                    if (rule.lineNumbers && rule.lineNumbers.length > 0 && !rule.lineNumbers.includes(itemIndexInt)) return;
+
+                    // 檢查排除狀態
+                    let isExcludedByRule = false;
+                    if (rule.exclusions && rule.exclusions.length > 0) {
+                        for (const exclusion of rule.exclusions) {
+                            if (originalFullText.includes(exclusion)) {
+                                const hitKey = `${itemIndexInt}-${original}-${exclusion}`;
+                                if (!overriddenExclusionHits.has(hitKey)) {
+                                    isExcludedByRule = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (isExcludedByRule) return;
+
+                    // 尋找匹配
+                    const regex = new RegExp(escapeRegExp(original), 'g');
+                    let match;
+                    while ((match = regex.exec(originalFullText)) !== null) {
+                        potentialChanges.push({ start: match.index, end: match.index + original.length, from: original, to: rule.replacement });
+                    }
+                });
+
+                // 解決衝突
+                potentialChanges.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+                const finalChanges = [];
+                let lastEnd = -1;
+                for (const change of potentialChanges) {
+                    if (change.start >= lastEnd) {
+                        finalChanges.push(change);
+                        lastEnd = change.end;
+                    }
+                }
+
+                if (finalChanges.length > 0) {
+                    let newText = "";
+                    let lastIndex = 0;
+                    // 原子化地構建新字串，並在過程中更新計數
+                    finalChanges.forEach(change => {
+                        newText += originalFullText.substring(lastIndex, change.start);
+                        newText += change.to;
+                        lastIndex = change.end;
+                        ruleCurrentCounts[change.from]++;
+                        change.count = ruleCurrentCounts[change.from]; // 為每個變更記錄它是第幾個
+                    });
+                    newText += originalFullText.substring(lastIndex);
+                    item.text = newText;
+                    changesByLine[itemIndexInt] = finalChanges;
+                }
+            });
+            
+            return { modifiedData, changesByLine, ruleTotalCounts };
+        }
+        function getCharacterOffsetTop(textarea, charIndex) { const rulerId = 'textarea-ruler'; let ruler = document.getElementById(rulerId); if (!ruler) { ruler = document.createElement('div'); ruler.id = rulerId; document.body.appendChild(ruler); } const style = window.getComputedStyle(textarea); const cssProperties = ['box-sizing','padding-top','padding-right','padding-bottom','padding-left','border-top-width','border-right-width','border-bottom-width','border-left-width','border-top-style','border-right-style','border-bottom-style','border-left-style','font-family','font-size','font-weight','font-style','letter-spacing','line-height','text-rendering','text-transform','white-space','word-wrap','word-break']; let cssString = `position: absolute; visibility: hidden; top: -9999px; left: 0; width: ${textarea.clientWidth}px;`; cssProperties.forEach(prop => { cssString += `${prop.replace(/([A-Z])/g, '-$1').toLowerCase()}: ${style.getPropertyValue(prop)};`; }); ruler.style.cssText = cssString; let textBefore = textarea.value.substring(0, charIndex); textBefore = textBefore.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br />'); ruler.innerHTML = textBefore + '<span style="display: inline-block;"></span>'; const marker = ruler.querySelector('span'); return marker.offsetTop; }
+        function highlightAndScrollToLine(lineNumberStr) { if (!lineNumberStr) return; const targetTextarea = subtitleText; const subTextContent = targetTextarea.value; const format = detectSubtitleFormat(subTextContent); let start = -1, end = -1; if (format === 'formatSrt') { const regex = new RegExp(`^${lineNumberStr}\\s*\\n`, 'm'); const blockMatch = subTextContent.match(regex); if (blockMatch) { start = blockMatch.index; const blockEndIndex = subTextContent.indexOf('\n\n', start); end = (blockEndIndex === -1) ? subTextContent.length : blockEndIndex; } } else if (format === 'formatVttLike') { const lines = subTextContent.split('\n'); const targetLineIndex = parseInt(lineNumberStr, 10) - 1; if (targetLineIndex >= 0 && targetLineIndex < lines.length) { start = 0; for (let i = 0; i < targetLineIndex; i++) { start += lines[i].length + 1; } end = start + lines[targetLineIndex].length; } } if (start !== -1) { targetTextarea.focus({ preventScroll: true }); targetTextarea.setSelectionRange(start, end); const scrollTop = getCharacterOffsetTop(targetTextarea, start); targetTextarea.scrollTop = Math.max(0, scrollTop - (targetTextarea.clientHeight / 4)); } }
+        function navigateToSubtitleLine(lineNumberStr) { if (!lineNumberStr) return; highlightAndScrollToLine(lineNumberStr); const targetItem = currentParsedSubs.find(item => item.index == lineNumberStr); if (targetItem) { const startTimeSrt = (targetItem.originalFormat === 'formatSrt') ? targetItem.start : vttLikeTimeToSrt(targetItem.start); const startTimeInSeconds = timeToMs(startTimeSrt) / 1000; seekAndPlay(startTimeInSeconds); } }
+		// [大師級修正 V3] 修正核心UI刷新引擎，確保正確呼叫 applyCorrections
+		function refreshCorrectionUI() {
+			const scrollPosition = outputLog.scrollTop;
+
+			// 1. 收集所有當前的UI狀態
+			const cancellationStatus = {
+				globallyReverted: new Set(),
+				instanceReverted: new Set(),
+				overriddenExclusionHits: overriddenExclusionHits // 沿用全域的覆寫設定
+			};
+			document.querySelectorAll('#outputLog .revert-rule:checked').forEach(cb => {
+				cancellationStatus.globallyReverted.add(cb.dataset.ruleOriginal.replace(/\\/g, ''));
+			});
+			document.querySelectorAll('#outputLog .revert-instance:checked').forEach(cb => {
+				const original = cb.dataset.ruleOriginal.replace(/\\/g, '');
+				const replacement = decodeURIComponent(cb.dataset.ruleReplacement);
+				const key = `${cb.dataset.itemIndex}-${original}->${replacement}`;
+				cancellationStatus.instanceReverted.add(key);
+			});
+			
+			// 2. 準備修正規則
+			const baseCorrectionMap = parseCorrection(correctionText.value, removeBrackets.checked);
+			const newRulesText = newlyAddedRules.value;
+			const newCorrectionMap = newRulesText ? parseNewCorrectionFormat(newRulesText, false).map : {};
+			const finalCorrectionMap = { ...baseCorrectionMap, ...newCorrectionMap };
+
+			// 3. 呼叫我們增強後的 applyCorrections 函式，傳入最新的UI狀態
+			const result = applyCorrections(currentParsedSubs, finalCorrectionMap, cancellationStatus);
+
+			// 4. 用函式返回的、正確的HTML結果來更新畫面
+			outputLog.innerHTML = result.outputLog;
+			
+			// 5. 更新全域狀態和UI元素
+			appliedCorrectionsData = result.appliedCorrections;
+			totalCorrectionsCount = result.correctionCount;
+			updateHiddenRules();
+			
+			const showRevertOptions = isDefaultShowRevertEnabled || document.querySelector('#toggleRevertControlsBtn')?.textContent.includes('隱藏');
+			outputLog.querySelectorAll('.revert-controls').forEach(control => {
+				control.style.display = showRevertOptions ? 'block' : 'none';
+			});
+
+			// 恢復滾動位置，提供流暢體驗
+			outputLog.scrollTop = scrollPosition;
+		}	
+		function handleDiffLineClick(event) {
+			const target = event.target;
+			const relevantContainer = target.closest('#output-column, #correctionSummaryContainer, #controls-column');
+			if (!relevantContainer) return;
+
+			let shouldRefresh = false;
+
+			// 處理歸檔邏輯
+			if (target.matches('.archive-rule-checkbox')) {
+				const allRuleKeysJSON = target.getAttribute('data-all-rule-keys');
+				if (allRuleKeysJSON) {
+					const allRuleKeys = JSON.parse(allRuleKeysJSON);
+					allRuleKeys.forEach(ruleKey => {
+						if (target.checked) {
+							globallyArchivedRules.add(ruleKey);
+						} else {
+							globallyArchivedRules.delete(ruleKey);
+						}
+					});
+					shouldRefresh = true;
+				}
+			}
+			
+			// 處理取消規則邏輯
+			if (target.matches('.revert-rule') || target.matches('.revert-instance')) {
+				shouldRefresh = true;
+			}
+
+			// 如果有任何需要刷新的操作，則呼叫刷新引擎
+			if (shouldRefresh) {
+				refreshCorrectionUI();
+				return; // 完成操作，退出函式
+			}
+
+			// --- 以下是無需刷新的點擊操作 ---
+
+			// 在 handleDiffLineClick 函式內部
+			if (target.matches('.add-rule-btn')) { 
+				event.preventDefault(); 
+				const diffLine = target.closest('.diff-line'); 
+				if (!diffLine) return; 
+				const itemIndex = diffLine.dataset.itemIndexLine; 
+				const appliedRulesOnLine = appliedCorrectionsData[itemIndex]?.rulesApplied || [];
+				const firstRule = appliedRulesOnLine.length > 0 ? appliedRulesOnLine[0] : { from: '', to: '' }; 
+				showNewRuleModal(itemIndex, firstRule.from, firstRule.to); 
+				return; 
+			}
+			
+			const interactiveTag = target.closest('.interactive-rule-tag'); 
+			if (interactiveTag) { event.preventDefault(); const from = interactiveTag.dataset.ruleFrom; const to = interactiveTag.dataset.ruleTo; showRuleManagementModal(from, to); return; } 
+			
+			if(target.id === 'show-hidden-summary-link' || target.closest('#show-hidden-summary-link')) { event.preventDefault(); showHiddenItemsModal('所有被隱藏的項目', () => true); return; } 
+			
+			if(target.matches('.show-hidden-rule-link') || target.closest('.show-hidden-rule-link')) { event.preventDefault(); const link = target.closest('.show-hidden-rule-link'); const ruleKey = link.dataset.ruleKey; const [from, to] = ruleKey.split(' -> '); const title = `被隱藏的規則: <span class="from">${from}</span> → <span class="to">${to}</span>`; showHiddenItemsModal(title, (line, rule) => rule.from === from && rule.to === to); return; } 
+			
+			const header = target.closest('.diff-header-title'); 
+			if (header && header.textContent.startsWith('修正字幕行')) { event.preventDefault(); const match = header.textContent.match(/修正字幕行 #(\d+)/); if (match) { const lineNumberStr = match[1]; navigateToSubtitleLine(lineNumberStr); } } 
+		}
+        function updateHiddenRules() { const summaryTextHolder = correctionSummaryContainer.querySelector('#correctionSummary'); if (!hideCancelledRulesToggle.checked) { document.querySelectorAll('#outputLog .diff-line').forEach(line => {
+                const isArchivedByRule = line.dataset.archivedByRule === 'true';
+                line.style.display = isArchivedByRule ? 'none' : 'block';
+            }); document.querySelectorAll('#outputLog .count-tag .hidden-count').forEach(span => span.innerHTML = ''); if (summaryTextHolder) { summaryTextHolder.innerHTML = `總共修正了 ${totalCorrectionsCount} 處`; } return; } let totalHiddenInstancesThisView = 0; const hiddenInstancesByRuleKeyThisView = new Map(); outputLog.querySelectorAll('.diff-line').forEach(currentLine => { const itemIndex = currentLine.dataset.itemIndexLine; let isLineArchived = currentLine.dataset.archived === 'true'; let isArchivedByRule = currentLine.dataset.archivedByRule === 'true'; let allInstancesOnLineHidden = true; const instanceCheckboxes = currentLine.querySelectorAll('.revert-instance'); if (instanceCheckboxes.length === 0 && !isLineArchived && !isArchivedByRule) { allInstancesOnLineHidden = false; } else if (instanceCheckboxes.length > 0) { instanceCheckboxes.forEach(instanceCb => { const globalCbChecked = document.querySelector(`.revert-rule[data-rule-original="${instanceCb.dataset.ruleOriginal}"]:checked`); if (isLineArchived || isArchivedByRule || instanceCb.checked || globalCbChecked ) { totalHiddenInstancesThisView++; const ruleKey = `${instanceCb.dataset.ruleOriginal.replace(/\\/g, '')} -> ${decodeURIComponent(instanceCb.dataset.ruleReplacement)}`; hiddenInstancesByRuleKeyThisView.set(ruleKey, (hiddenInstancesByRuleKeyThisView.get(ruleKey) || 0) + 1); } else { allInstancesOnLineHidden = false; } }); } currentLine.style.display = (isLineArchived || isArchivedByRule || allInstancesOnLineHidden) ? 'none' : 'block'; }); outputLog.querySelectorAll('.count-tag').forEach(tag => { const ruleKey = tag.dataset.ruleKey; const hiddenCountSpan = tag.querySelector('.hidden-count'); const hiddenCount = hiddenInstancesByRuleKeyThisView.get(ruleKey) || 0; if (hiddenCount > 0) { hiddenCountSpan.innerHTML = ` <a href="#" class="show-hidden-rule-link" data-rule-key="${ruleKey}" style="color:var(--info-color);text-decoration:none;">(隱藏${hiddenCount})</a>`; } else { hiddenCountSpan.innerHTML = ''; } }); if (summaryTextHolder) { let summaryHTML = `總共修正了 ${totalCorrectionsCount} 處`; if (totalHiddenInstancesThisView > 0) { summaryHTML += ` <span class="hidden-summary"><a href="#" id="show-hidden-summary-link">(隱藏${totalHiddenInstancesThisView}處)</a></span>`; } summaryTextHolder.innerHTML = summaryHTML; }}
+        function showNewRuleModal(lineNumber = '', prefilledOriginal = '', prefilledReplacement = '') { newRuleFormContainer.innerHTML = ` <div class="new-rule-grid"> <label>原始字幕:</label> <div class="input-wrapper"> <input type="checkbox" id="modal-get-original-cb" title="自動填入此行被修正的原文"> <input type="text" id="modal-rule-original" required> </div> </div> <div class="new-rule-grid"> <label>替換字幕:</label> <div class="input-wrapper"> <input type="checkbox" id="modal-get-replacement-cb" title="自動填入此行的修正後文字"> <input type="text" id="modal-rule-replacement"> </div> </div> <div class="new-rule-grid"> <label>避免修正:</label> <input type="text" id="modal-rule-exclusion" placeholder="詞1,詞2 (用逗號分隔，選填)"> </div> <div class="new-rule-grid"> <label>修正行號:</label> <div class="input-wrapper"> <input type="checkbox" id="modal-get-line-cb" title="自動填入當前字幕行號"> <input type="text" id="modal-rule-lines" placeholder="1,5,12 (用逗號分隔，選填)"> </div> </div>`; const originalInput = document.getElementById('modal-rule-original'); const replacementInput = document.getElementById('modal-rule-replacement'); const linesInput = document.getElementById('modal-rule-lines'); const getOriginalCb = document.getElementById('modal-get-original-cb'); const getReplacementCb = document.getElementById('modal-get-replacement-cb'); const getLineCb = document.getElementById('modal-get-line-cb'); getOriginalCb.addEventListener('change', () => { originalInput.value = getOriginalCb.checked ? prefilledOriginal : ''; }); getReplacementCb.addEventListener('change', () => { replacementInput.value = getReplacementCb.checked ? prefilledReplacement : ''; }); getLineCb.addEventListener('change', () => { if (getLineCb.checked && lineNumber) { const existingLines = linesInput.value.trim().split(',').filter(Boolean).map(n=>parseInt(n)); if (!existingLines.includes(parseInt(lineNumber))) { existingLines.push(parseInt(lineNumber)); linesInput.value = existingLines.sort((a,b) => a-b).join(','); } } else { const existingLines = linesInput.value.trim().split(',').filter(Boolean).map(n=>parseInt(n)); const index = existingLines.indexOf(parseInt(lineNumber)); if (index > -1) { existingLines.splice(index, 1); linesInput.value = existingLines.sort((a,b) => a-b).join(','); } } }); openModal(newRuleModal); }
+        function diffStrings(oldStr, newStr) { const n = oldStr.length; const m = newStr.length; const dp = Array(n + 1).fill(0).map(() => Array(m + 1).fill(0)); for (let i = 1; i <= n; i++) { for (let j = 1; j <= m; j++) { if (oldStr[i - 1] === newStr[j - 1]) { dp[i][j] = dp[i - 1][j - 1] + 1; } else { dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]); } } } let i = n, j = m; let original = '', corrected = ''; while (i > 0 || j > 0) { if (i > 0 && j > 0 && oldStr[i - 1] === newStr[j - 1]) { original = oldStr[i - 1] + original; corrected = newStr[j - 1] + corrected; i--; j--; } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) { corrected = `<span class="added">${newStr[j - 1]}</span>` + corrected; j--; } else if (i > 0 && (j === 0 || dp[i][j - 1] < dp[i - 1][j])) { original = `<span class="removed">${oldStr[i - 1]}</span>` + original; i--; } else { break; } } return { original, corrected }; }
+        
+        function calculateAccurateRuleCounts(subtitleText, correctionRulesText, shouldRemoveBrackets) {
+            const ruleCounts = new Map();
+            if (!subtitleText || !correctionRulesText) {
+                return ruleCounts;
+            }
+
+            const parsedSubs = parseSubtitle(subtitleText);
+            const correctionMap = parseCorrection(correctionRulesText, shouldRemoveBrackets);
+
+            if (parsedSubs.length === 0 || Object.keys(correctionMap).length === 0) {
+                return ruleCounts;
+            }
+
+            const correctionKeys = Object.keys(correctionMap).sort((a, b) => b.length - a.length);
+
+            correctionKeys.forEach(original => {
+                ruleCounts.set(original, 0);
+            });
+
+            parsedSubs.forEach(item => {
+                let shadowLineText = item.text;
+                const itemIndexInt = parseInt(item.index, 10);
+
+                correctionKeys.forEach(original => {
+                    const rule = correctionMap[original];
+                    if (!rule || rule.replacement === null) return;
+
+                    if (rule.lineNumbers && rule.lineNumbers.length > 0 && !rule.lineNumbers.includes(itemIndexInt)) {
+                        return;
+                    }
+
+                    let countableText = shadowLineText;
+                    if (rule.exclusions && rule.exclusions.length > 0) {
+                        rule.exclusions.forEach(excl => {
+                            countableText = countableText.replace(new RegExp(escapeRegExp(excl), 'g'), (match) => '\uFFFD'.repeat(match.length));
+                        });
+                    }
+                    
+                    const matches = countableText.match(new RegExp(escapeRegExp(original), 'g'));
+                    if (matches && matches.length > 0) {
+                        const currentCount = ruleCounts.get(original) || 0;
+                        ruleCounts.set(original, currentCount + matches.length);
+                        shadowLineText = shadowLineText.replace(new RegExp(escapeRegExp(original), 'g'), (match) => '\uFFFD'.repeat(match.length));
+                    }
+                });
+            });
+
+            return ruleCounts;
+        }
+
+        function showAddedRulesModal() { addedRulesTextarea.value = newlyAddedRules.value; openModal(addedRulesModal); }
+        function showRuleManagementModal(from, to) { ruleManagementModalList.innerHTML = ''; let totalCount = 0; let appliedCount = 0; for (const itemIndex in appliedCorrectionsData) { const data = appliedCorrectionsData[itemIndex]; const lineEl = outputLog.querySelector(`.diff-line[data-item-index-line="${itemIndex}"]`); if (!lineEl) continue; const isRuleApplied = data.rulesApplied.some(rule => rule.from === from && rule.to === to); if (isRuleApplied) { totalCount++; if (lineEl.dataset.archived === 'true' || lineEl.dataset.archivedByRule === 'true') continue; const escapedFrom = escapeRegExp(from); const instanceCheckbox = lineEl.querySelector(`.revert-instance[data-item-index="${itemIndex}"][data-rule-original="${escapedFrom}"]`); const globalCheckboxChecked = document.querySelector(`.revert-rule[data-rule-original="${escapedFrom}"]:checked`); const isReverted = (instanceCheckbox && instanceCheckbox.checked) || (globalCheckboxChecked); if (!isReverted) { appliedCount++; } const li = document.createElement('li'); li.dataset.targetIndex = itemIndex; const originalLineText = data.originalText; const highlightedText = originalLineText.replace(new RegExp(escapedFrom, 'g'), `<span class="removed">${from}</span>`); li.innerHTML = `<label><input type="checkbox" class="modal-revert-cb" data-target-index="${itemIndex}" data-rule-original="${escapedFrom}" ${!isReverted ? 'checked' : ''}><span><a href="#" class="modal-nav-link" data-nav-index="${itemIndex}">行 ${itemIndex}</a>: ${highlightedText}</span></label>`; ruleManagementModalList.appendChild(li); } } const cancelledCount = totalCount - appliedCount; ruleManagementModalTitle.innerHTML = `管理規則: <span class="from">${from}</span> → <span class="to">${to}</span>  <span class="modal-count-summary">(總共${totalCount}條 / 應用項:${appliedCount} / 取消項:${cancelledCount})</span>`; openModal(ruleManagementModal); }
+        
+        function showHiddenItemsModal(baseTitle, filterFn) {
+            const updateTitleWithCount = (listElement, titleElement) => {
+                const totalItems = listElement.children.length;
+                const checkedItems = listElement.querySelectorAll('input:checked').length;
+                const uncheckedItems = totalItems - checkedItems;
+                titleElement.innerHTML = `${baseTitle}  <span class="modal-count-summary">(總共${totalItems}項 / 核取恢復項:${checkedItems} / 未恢復項:${uncheckedItems})</span>`;
+            };
+            const existingTab = correctionModal.querySelector('.modal-tab-container');
+            if (existingTab) existingTab.remove();
+            const tabContainer = document.createElement('div');
+            tabContainer.className = 'modal-tab-container';
+            tabContainer.innerHTML = ` <div class="modal-tab active" data-tab-filter="all">不分項</div> <div class="modal-tab" data-tab-filter="archived">歸檔項</div> <div class="modal-tab" data-tab-filter="cancelled">取消項</div> `;
+            modalCorrectionList.innerHTML = '';
+            modalCorrectionList.before(tabContainer);
+            modalCorrectionList.onchange = () => updateTitleWithCount(modalCorrectionList, modalTitle);
+            
+            const allHiddenItems = [];
+            outputLog.querySelectorAll('.diff-line').forEach(line => {
+                const itemIndex = line.dataset.itemIndexLine;
+                const data = appliedCorrectionsData[itemIndex];
+                if (!data) return;
+
+                data.rulesApplied.forEach(rule => {
+                    if (!filterFn(line, rule)) return;
+
+                    const isLineArchived = line.dataset.archived === 'true';
+                    const isArchivedByRule = line.dataset.archivedByRule === 'true';
+                    const instanceCheckbox = line.querySelector(`.revert-instance[data-item-index="${itemIndex}"][data-rule-original="${escapeRegExp(rule.from)}"]`);
+                    const globalCheckboxChecked = document.querySelector(`.revert-rule[data-rule-original="${escapeRegExp(rule.from)}"]:checked`);
+                    const isInstanceCancelled = instanceCheckbox ? instanceCheckbox.checked : false;
+                    const isGloballyCancelled = !!globalCheckboxChecked;
+                    const ruleKey = `${rule.from} -> ${rule.to}`;
+
+                    let hideReason = '';
+                    let hideReasonClass = '';
+                    
+                    if (isArchivedByRule && globallyArchivedRules.has(ruleKey)) {
+                        hideReason = '全域歸檔'; hideReasonClass = 'reason-archived';
+                    } else if (isLineArchived) {
+                        hideReason = '已歸檔'; hideReasonClass = 'reason-archived';
+                    } else if (isGloballyCancelled) {
+                        hideReason = '全域取消'; hideReasonClass = 'reason-cancelled';
+                    } else if (isInstanceCancelled) {
+                        hideReason = '已取消'; hideReasonClass = 'reason-cancelled';
+                    }
+
+                    if (hideReason) {
+                        const itemType = (hideReason.includes('歸檔')) ? 'archived' : 'cancelled';
+                        allHiddenItems.push({ data, itemIndex, type: itemType, rule: rule, reason: hideReason, reasonClass: hideReasonClass });
+                    }
+                });
+            });
+
+            const renderList = (filterType) => {
+                modalCorrectionList.innerHTML = '';
+                const itemsToRender = allHiddenItems.filter(item => filterType === 'all' || item.type === filterType);
+                itemsToRender.forEach(({ data, itemIndex, type, rule, reason, reasonClass }) => {
+                    const action = (type === 'archived') ? 'unarchive' : 'unrevert';
+                    const highlightedText = data.originalText.replace(new RegExp(escapeRegExp(rule.from), 'g'), `<span class="removed">${rule.from}</span>`);
+                    const li = document.createElement('li');
+                    li.innerHTML = `<label> <input type="checkbox" class="modal-unhide-cb" data-target-line-index="${itemIndex}" data-rule-original="${escapeRegExp(rule.from)}" data-action="${action}" data-rule-key="${rule.from} -> ${rule.to}"> <span> <a href="#" class="modal-nav-link" data-nav-index="${itemIndex}">行 ${itemIndex}</a>: ${highlightedText} (套用規則: <a href="#" class="modal-rule-link" data-rule-from="${rule.from}" data-rule-to="${rule.to}">${rule.from}→${rule.to}</a>) <span class="hide-reason ${reasonClass}">(${reason})</span> </span> </label>`;
+                    modalCorrectionList.appendChild(li);
+                });
+                updateTitleWithCount(modalCorrectionList, modalTitle);
+            };
+
+            tabContainer.addEventListener('click', (e) => {
+                if (e.target.classList.contains('modal-tab')) {
+                    tabContainer.querySelector('.active').classList.remove('active');
+                    e.target.classList.add('active');
+                    renderList(e.target.dataset.tabFilter);
+                }
+            });
+            renderList('all');
+            modalApplyBtn.dataset.modalType = 'unhide-items';
+            openModal(correctionModal);
+        }
+
+        function startFollow() { if (!followVideoToggle.checked || !currentPlayer.isReady) { return; } stopFollow(); followInterval = setInterval(updateFollow, 250); }
+        function stopFollow() { clearInterval(followInterval); followInterval = null; }
+		// [新功能] 中央狀態管理函式，用於同步所有「字幕跟隨」的控制項
+		function setFollowState(shouldFollow) {
+			// 更新內部狀態
+			followVideoToggle.checked = shouldFollow;
+			
+			// 更新播放器上的按鈕UI
+			if(toggleFollowBtn) {
+				toggleFollowBtn.classList.toggle('active', shouldFollow);
+				toggleFollowBtn.textContent = shouldFollow ? '📝✅' : '📝➡️';
+				toggleFollowBtn.title = shouldFollow ? '停止字幕跟隨' : '字幕跟隨影片';
+			}
+
+			// 更新影片設定彈窗中的 checkbox 狀態
+			if(followVideoToggleModal) {
+				followVideoToggleModal.checked = shouldFollow;
+			}
+
+			// 啟動或停止跟隨
+			if (shouldFollow) {
+				startFollow();
+			} else {
+				stopFollow();
+			}
+		}
+        function updateFollow() { if (!currentPlayer.player || !currentPlayer.isReady || currentParsedSubs.length === 0) return; let currentTime = 0; if (currentPlayer.type === 'youtube' && typeof currentPlayer.player.getCurrentTime === 'function') { currentTime = currentPlayer.player.getCurrentTime(); } else if (currentPlayer.type === 'local') { currentTime = currentPlayer.player.currentTime; } const currentTimeMs = currentTime * 1000; const activeSubIndex = currentParsedSubs.findIndex(sub => { const startMs = timeToMs(sub.originalFormat === 'formatSrt' ? sub.start : vttLikeTimeToSrt(sub.start)); const endMs = timeToMs(sub.originalFormat === 'formatSrt' ? sub.end : vttLikeTimeToSrt(sub.end)); return currentTimeMs >= startMs && currentTimeMs <= endMs; }); if (activeSubIndex !== -1 && activeSubIndex !== lastActiveLineIndex) { lastActiveLineIndex = activeSubIndex; const activeSub = currentParsedSubs[activeSubIndex]; highlightAndScrollToLine(activeSub.index); } }
+        
+        function togglePlayback() {
+            if (!currentPlayer.player || !currentPlayer.isReady) return;
+            if (currentPlayer.isPlaying) {
+                if (currentPlayer.type === 'youtube') currentPlayer.player.pauseVideo();
+                else if (currentPlayer.type === 'local') currentPlayer.player.pause();
+            } else {
+                if (currentPlayer.type === 'youtube') currentPlayer.player.playVideo();
+                else if (currentPlayer.type === 'local') currentPlayer.player.play();
+            }
+        }
+        
+        // --- Event Listeners ---
+        darkModeToggleBtn.addEventListener('click', () => toggleDarkMode(!body.classList.contains('dark-mode')));
+        subtitleFile.addEventListener('change', (e) => { readFile(e.target.files[0], subtitleText, handleSubtitleTextChange); e.target.value = null; });
+        subtitleText.addEventListener('input', handleSubtitleTextChange);
+        correctionFile.addEventListener('change', (e) => { readFile(e.target.files[0], correctionText, () => {
+            correctionText.value = sanitizeCorrectionRules(correctionText.value);
+        }); e.target.value = null; });
+        correctionText.addEventListener('change', () => {
+            correctionText.value = sanitizeCorrectionRules(correctionText.value);
+        });
+
+		// [大師級修正 V3] 確保主按鈕也使用一致的刷新邏輯
+		fixButton.addEventListener('click', () => {
+			const subtitle = subtitleText.value; 
+			const correction = correctionText.value; 
+			if (!subtitle) { alert("請提供字幕內容。"); return; } 
+			
+			const baseCorrectionMap = parseCorrection(correction, removeBrackets.checked);
+			const newRulesText = newlyAddedRules.value;
+			const newCorrectionMap = newRulesText ? parseNewCorrectionFormat(newRulesText, false).map : {};
+			const finalCorrectionMap = { ...baseCorrectionMap, ...newCorrectionMap };
+
+			if (Object.keys(finalCorrectionMap).length === 0) {
+				 alert("未找到有效的修正規則。"); 
+				 outputLog.innerHTML = `<div style="text-align:center; color: var(--text-color-muted); height: 100%; display:flex; align-items:center; justify-content:center;"><p>未發現需要修正的內容</p></div>`;
+				 return;
+			}
+			 
+			const parsedData = currentParsedSubs; 
+			if (parsedData.length === 0) { alert("無法解析字幕檔，請檢查字幕格式。"); return; } 
+			
+			// 清理舊狀態
+			globallyArchivedRules.clear(); 
+			overriddenExclusionHits.clear();
+
+			// 呼叫 applyCorrections，不傳遞 cancellationStatus，使用其預設的空物件，代表一次全新的修正
+			const result = applyCorrections(parsedData, finalCorrectionMap);
+			
+			// 更新全域變數和UI
+			appliedCorrectionsData = result.appliedCorrections; 
+			totalCorrectionsCount = result.correctionCount; 
+			outputLog.innerHTML = result.outputLog; 
+			
+			gridWrapper.classList.remove('view-mode-controls');
+			gridWrapper.classList.add('view-mode-output');
+			layoutBtn.classList.remove('active'); 
+
+			if (result.correctionCount > 0) { 
+				correctionSummaryContainer.style.display = 'block'; 
+				revertControlsVisible = isDefaultShowRevertEnabled;
+				outputLog.querySelectorAll('.revert-controls').forEach(control => { control.style.display = revertControlsVisible ? 'block' : 'none'; });
+				toggleRevertControlsBtn.textContent = revertControlsVisible ? '隱藏選項' : '顯示選項';
+			} else { 
+				correctionSummaryContainer.style.display = 'none'; 
+			} 
+			hideCancelledRulesToggle.checked = true; 
+			updateHiddenRules(); 
+		});
+        
+        applyDirectAdjustBtn.addEventListener('click', () => { const result = getAdjustedSubtitle(); if (result) { subtitleText.value = result.content; handleSubtitleTextChange(); alert("時間軸調整已應用。"); scrollToElement(subtitleText); } });
+        downloadDirectAdjustBtn.addEventListener('click', () => { const result = getAdjustedSubtitle(); if (result) { const originalFileName = getFileName(subtitleFile, 'subtitle.txt'); const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.')); const extension = originalFileName.substring(originalFileName.lastIndexOf('.')); downloadFile(result.content, `${baseName}_adjusted${extension}`, 'text/plain;charset=utf-8'); } });
+        calculateSyncBtn.addEventListener('click', () => { const timePattern = /^\d{2}:\d{2}:\d{2},\d{3}$/; const inputs = [originalStartInput, originalEndInput, targetStartInput, targetEndInput]; if (inputs.some(input => !timePattern.test(input.value.trim()))) { alert('請輸入正確的時間格式 (HH:MM:SS,ms)'); return; } const oStart = timeToMs(originalStartInput.value); const oEnd = timeToMs(originalEndInput.value); const tStart = timeToMs(targetStartInput.value); const tEnd = timeToMs(targetEndInput.value); const oDuration = oEnd - oStart; const tDuration = tEnd - tStart; if (oDuration <= 0 || tDuration <= 0) { alert('起迄時間必須是正數時間段。'); return; } const timeShift = tStart - (oStart * tDuration / oDuration); const speedFactor = oDuration / tDuration; lastCalculatedParams = { timeShift, speedFactor }; syncInfoPanel.innerHTML = `<b>計算結果:</b><br>- 時間偏移: ${msToTime(timeShift, true)}<br>- 速率因子: <input type="number" id="speedFactorSync" value="${speedFactor.toFixed(6)}" step="0.000001" style="width: 120px; display: inline-block;">`; applyAnchorSyncBtn.disabled = false; downloadAnchorSyncBtn.disabled = false; scrollToElement(anchorSyncApplyButtonGroup, 'center'); });
+        applyAnchorSyncBtn.addEventListener('click', () => { const result = getSyncedSubtitle(); if (result) { subtitleText.value = result.content; handleSubtitleTextChange(); alert("錨點同步已應用。"); scrollToElement(subtitleText); } });
+        downloadAnchorSyncBtn.addEventListener('click', () => { const result = getSyncedSubtitle(); if (result) { const originalFileName = getFileName(subtitleFile, 'subtitle.txt'); const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.')); const extension = originalFileName.substring(originalFileName.lastIndexOf('.')); downloadFile(result.content, `${baseName}_synced${extension}`, 'text/plain;charset=utf-8'); } });
+        applyCutBtn.addEventListener('click', () => { const result = getCutSubtitle(); if (result) { subtitleText.value = result.content; handleSubtitleTextChange(); alert(`字幕已從第 ${result.startLine} 行切割至第 ${result.endLine} 行`); scrollToElement(subtitleText); } });
+        downloadCutBtn.addEventListener('click', () => { const result = getCutSubtitle(); if(result) { const originalFileName = getFileName(subtitleFile, 'subtitle.txt'); const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.')); const extension = originalFileName.substring(originalFileName.lastIndexOf('.')); const newFileName = `${baseName}_cut_${result.startLine}-${result.endLine}${extension}`; downloadFile(result.content, newFileName, 'text/plain;charset=utf-8'); } });
+        cutStartLineInput.addEventListener('input', () => { isUpdatingCutFields = true; const line = parseInt(cutStartLineInput.value, 10); const parsedData = currentParsedSubs; if (!isNaN(line) && line > 0 && line <= parsedData.length) { const item = parsedData[line - 1]; cutStartInput.value = (item.originalFormat === 'formatSrt') ? item.start : vttLikeTimeToSrt(item.start); } isUpdatingCutFields = false; });
+        cutEndLineInput.addEventListener('input', () => { isUpdatingCutFields = true; const line = parseInt(cutEndLineInput.value, 10); const parsedData = currentParsedSubs; if (!isNaN(line) && line > 0 && line <= parsedData.length) { const item = parsedData[line - 1]; cutEndInput.value = (item.originalFormat === 'formatSrt') ? item.end : vttLikeTimeToSrt(item.end); } isUpdatingCutFields = false; });
+        cutStartInput.addEventListener('input', () => { isUpdatingCutFields = true; const timeMs = parseFlexibleTimestamp(cutStartInput.value); const parsedData = currentParsedSubs; if (!isNaN(timeMs) && parsedData.length > 0) { const timeParser = (ts, format) => (format === 'formatSrt' ? timeToMs(ts) : timeToMs(vttLikeTimeToSrt(ts))); const index = parsedData.findIndex(item => timeParser(item.start, item.originalFormat) >= timeMs); cutStartLineInput.value = (index === -1) ? parsedData.length : index + 1; } isUpdatingCutFields = false; });
+        cutEndInput.addEventListener('input', () => { isUpdatingCutFields = true; const timeMs = parseFlexibleTimestamp(cutEndInput.value); const parsedData = currentParsedSubs; if (!isNaN(timeMs) && parsedData.length > 0) { const timeParser = (ts, format) => (format === 'formatSrt' ? timeToMs(ts) : timeToMs(vttLikeTimeToSrt(ts))); const index = parsedData.findIndex(item => timeParser(item.end, item.originalFormat) >= timeMs); cutEndLineInput.value = (index === -1) ? parsedData.length : index + 1; } isUpdatingCutFields = false; });
+        mergeSubtitlesBtn.addEventListener('click', () => { const result = getMergedSubtitle(); if (result) { subtitleText.value = result.content; handleSubtitleTextChange(); alert(`字幕合併成功！共 ${result.count} 條字幕。`); scrollToElement(subtitleText); } });
+        downloadMergedBtn.addEventListener('click', () => { const subText1 = mergeFile1Content.value; const subText2 = mergeFile2Content.value; const originalFileName = getFileName(mergeFile1Input, 'subtitle1.txt'); const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.')); const extension = originalFileName.substring(originalFileName.lastIndexOf('.')); if (subText1.trim() && !subText2.trim()) { downloadFile(subText1, `${baseName}_merged${extension}`, 'text/plain;charset=utf-8'); alert('已下載檔案1區域中的內容。'); } else if (subText1.trim() && subText2.trim()) { const result = getMergedSubtitle(); if (result) { downloadFile(result.content, `${baseName}_merged${extension}`, 'text/plain;charset=utf-8'); } } else { alert('沒有可供下載的合併字幕內容。'); } });
+        addAndMergeBtn.addEventListener('click', () => { const result = getMergedSubtitle(); if (result) { mergeFile1Content.value = result.content; mergeFile1Input.value = ''; mergeFile2Content.value = ''; mergeFile2Input.value = ''; toggleAddMergeButton(); alert(`附加成功！檔案1中包含 ${result.count} 條字幕。`); } });
+        mergeFile1Input.addEventListener('change', (e) => { readFile(e.target.files[0], mergeFile1Content, toggleAddMergeButton); e.target.value = null; });
+        mergeFile2Input.addEventListener('change', (e) => { readFile(e.target.files[0], mergeFile2Content, toggleAddMergeButton); e.target.value = null; });
+        mergeFile1Content.addEventListener('input', toggleAddMergeButton);
+        mergeFile2Content.addEventListener('input', toggleAddMergeButton);
+        convertSubtitleFormatButton.addEventListener('click', () => { const currentText = subtitleText.value; const format = detectSubtitleFormat(currentText); if (format === 'unknown') { alert('無法識別的字幕格式。'); return; } const parsedData = parseSubtitle(currentText); if (format === 'formatSrt') { parsedData.forEach(item => { item.start = srtTimeToVttLike(item.start); item.end = srtTimeToVttLike(item.end); item.targetFormat = 'formatVttLike'; }); } else { parsedData.forEach(item => { item.start = vttLikeTimeToSrt(item.start); item.end = vttLikeTimeToSrt(item.end); item.targetFormat = 'formatSrt'; }); } subtitleText.value = rebuildSubtitle(parsedData); handleSubtitleTextChange(); alert('格式轉換成功！'); });
+        convertCorrectionFormatButton.addEventListener('click', () => { const currentText = correctionText.value; const format = detectCorrectionFormat(currentText); let resultText = ''; if (format === 'old') { resultText = convertOldToNewFormat(currentText); if (resultText) { correctionText.value = resultText; alert('已轉為新格式！'); } else { alert('未找到可轉換的舊格式內容。'); } } else if (format === 'new') { resultText = convertNewToOldFormat(currentText); if (resultText) { correctionText.value = resultText; alert('已轉為舊格式！'); } else { alert('未找到可轉換的新格式內容。'); } } });
+        const doCompareAndGenerate = () => {
+            const originalSubText = subtitleText.value; if (!originalSubText) { alert('請先載入原始字幕。'); return; }
+            const fileInput = document.createElement('input'); fileInput.type = 'file'; fileInput.accept = '.txt,.srt,.vtt';
+            fileInput.onchange = (e) => {
+                const file = e.target.files[0]; if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => { const correctedSubText = event.target.result; generateCorrectionRules(originalSubText, correctedSubText); };
+                    reader.readAsText(file, 'UTF-8');
+                }
+                e.target.value = null;
+            };
+            fileInput.click();
+        };
+        const doLinkCorrections = (previewContainer = linkedCorrectionsPreview, sourceTextarea = correctionText) => {
+            previewContainer.innerHTML = '';
+            const rules = parseCorrection(sourceTextarea.value, removeBrackets.checked);
+            
+            if (Object.keys(rules).length === 0) {
+                previewContainer.innerHTML = `<span style="color: var(--text-color-muted);">無有效的修正詞可連結。</span>`;
+                return;
+            }
+            if (subtitleText.value.trim() === '') {
+                 previewContainer.innerHTML = `<span style="color: var(--text-color-muted);">請先載入原始字幕以計算數量。</span>`;
+                 for (const original in rules) {
+                    const rule = rules[original];
+                    if (rule.replacement !== null) {
+                        const tag = document.createElement('span');
+                        tag.className = 'count-tag';
+                        tag.innerHTML = `<a class="interactive-rule-tag" href="#" data-rule-from="${original}" data-rule-to="${rule.replacement}"><span class="from">${original}</span> → <span class="to">${rule.replacement}</span></a>`;
+                        previewContainer.appendChild(tag);
+                    }
+                }
+                return;
+            }
+            
+            const accurateCounts = calculateAccurateRuleCounts(subtitleText.value, sourceTextarea.value, removeBrackets.checked);
+
+            for (const original in rules) {
+                const rule = rules[original];
+                if (rule.replacement !== null) {
+                    const tag = document.createElement('span');
+                    tag.className = 'count-tag';
+                    const count = accurateCounts.get(original) || 0;
+                    const countText = count > 0 ? ` (${count})` : '';
+                    tag.innerHTML = `<a class="interactive-rule-tag" href="#" data-rule-from="${original}" data-rule-to="${rule.replacement}"><span class="from">${original}</span> → <span class="to">${rule.replacement}</span>${countText}</a>`;
+                    previewContainer.appendChild(tag);
+                }
+            }
+        };
+
+        linkCorrectionsBtn.addEventListener('click', () => {
+            const isPreviewVisible = linkedCorrectionsPreview.style.display !== 'none';
+            if (isPreviewVisible) {
+                linkedCorrectionsPreview.style.display = 'none';
+                linkCorrectionsBtn.classList.remove('active');
+            } else {
+                doLinkCorrections();
+                linkedCorrectionsPreview.style.display = 'flex';
+                linkCorrectionsBtn.classList.add('active');
+            }
+        });
+        compareAndGenerateButton.addEventListener('click', doCompareAndGenerate);
+        modalCompareAndGenerateButton.addEventListener('click', () => { closeModal(correctionManagementModal); doCompareAndGenerate(); });
+        modalLinkCorrectionsBtn.addEventListener('click', () => {
+             const modalPreviewContainer = correctionManagementContent.querySelector('#linkedCorrectionsPreview');
+             const modalCorrectionText = correctionManagementContent.querySelector('#correctionText');
+             if (modalPreviewContainer && modalCorrectionText) {
+                const isPreviewVisible = modalPreviewContainer.style.display !== 'none';
+                if(isPreviewVisible) {
+                    modalPreviewContainer.style.display = 'none';
+                    modalLinkCorrectionsBtn.classList.remove('active');
+                } else {
+                    doLinkCorrections(modalPreviewContainer, modalCorrectionText);
+                    modalPreviewContainer.style.display = 'flex';
+                    modalLinkCorrectionsBtn.classList.add('active');
+                }
+             }
+        });
+        
+        // UX PRO FIX: Logic to show/hide controls when opening/closing the modal
+        bottomBarVideoBtn.addEventListener('click', () => { videoSettingsContent.appendChild(videoControlsSection); openModal(videoSettingsModal); });
+		bottomBarRulesBtn.addEventListener('click', () => {
+			controlsColumn.style.display = 'flex';
+			correctionManagementContent.appendChild(controlsColumn);
+			if (mainSecondaryActions) mainSecondaryActions.style.display = 'none'; // Hide only the secondary buttons
+			openModal(correctionManagementModal);
+		});
+		correctionManagementCloseBtn.addEventListener('click', () => {
+			document.getElementById('right-pane-wrapper').prepend(controlsColumn);
+			if (mainSecondaryActions) mainSecondaryActions.style.display = 'flex'; // Restore the secondary buttons
+			closeModal(correctionManagementModal);
+		});
+
+        modalRulesListBtn.addEventListener('click', () => showAddedRulesModal() );
+        modalRulesStatusBtn.addEventListener('click', () => { if (totalCorrectionsCount > 0) { showHiddenItemsModal('所有被隱藏的項目', () => true); } else { alert('請先執行「修正字幕」。'); } });
+        
+		// [大師級修正 V2] 修正 downloadFinalSub 函式，使其能根據參數決定行為
+		const downloadFinalSub = (returnOnly = false) => {
+			const originalSubText = subtitleText.value;
+			if (!originalSubText) {
+				if (!returnOnly) alert("沒有原始字幕。"); // 只有在實際下載時才提示
+				return null; // 返回null表示操作無法繼續
+			}
+
+			// 1. 合併所有規則來源
+			const baseCorrectionMap = parseCorrection(correctionText.value, removeBrackets.checked);
+			const newRulesText = newlyAddedRules.value;
+			const newCorrectionMap = newRulesText ? parseNewCorrectionFormat(newRulesText, false).map : {};
+			const finalCorrectionMap = { ...baseCorrectionMap, ...newCorrectionMap };
+
+			// 2. 收集所有取消狀態
+			const globallyReverted = new Set();
+			document.querySelectorAll('.revert-rule:checked').forEach(cb => {
+				globallyReverted.add(cb.dataset.ruleOriginal.replace(/\\/g, ''));
+			});
+
+			const instanceReverted = new Set();
+			document.querySelectorAll('.revert-instance:checked').forEach(cb => {
+				const original = cb.dataset.ruleOriginal.replace(/\\/g, '');
+				const replacement = decodeURIComponent(cb.dataset.ruleReplacement);
+				const key = `${cb.dataset.itemIndex}-${original}->${replacement}`;
+				instanceReverted.add(key);
+			});
+
+			// 3. 呼叫核心引擎，傳入所有規則和當前的取消狀態
+			const engineResult = buildFinalCorrectedText(
+				currentParsedSubs,
+				finalCorrectionMap,
+				{ globallyReverted, instanceReverted, overriddenExclusionHits }
+			);
+
+			// 4. 重建最終字幕內容
+			const finalSubtitleContent = rebuildSubtitle(engineResult.modifiedData);
+			
+			// 5. 根據 returnOnly 參數決定是返回內容還是觸發下載
+			if (returnOnly) {
+				return finalSubtitleContent; // 如果是預覽模式，直接返回內容
+			}
+
+			// --- 以下是下載邏輯 ---
+			const originalFileName = getFileName(subtitleFile, 'subtitle.txt');
+			const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.'));
+			const extension = originalFileName.substring(originalFileName.lastIndexOf('.'));
+			downloadFile(finalSubtitleContent, `${baseName}_corrected_final${extension}`, 'text/plain;charset=utf-8');
+		};
+        
+        const downloadFinalRules = () => {
+            if (Object.keys(appliedCorrectionsData).length === 0 && !newlyAddedRules.value.trim()) {
+                alert("請先執行「修正字幕」或新增規則。");
+                return;
+            }
+            const consolidatedRules = new Map();
+            const addRuleToConsolidate = (original, replacement, lineNumbers, exclusions = []) => {
+                const replacementKey = replacement === null ? '___NULL___' : replacement;
+                if (!consolidatedRules.has(original)) {
+                    consolidatedRules.set(original, new Map());
+                }
+                const replacementMap = consolidatedRules.get(original);
+                if (!replacementMap.has(replacementKey)) {
+                    replacementMap.set(replacementKey, { lineNumbers: new Set(), exclusions: new Set(exclusions) });
+                }
+                const ruleData = replacementMap.get(replacementKey);
+                lineNumbers.forEach(ln => ruleData.lineNumbers.add(ln));
+                exclusions.forEach(ex => ruleData.exclusions.add(ex));
+            };
+            const initialCorrectionMap = parseCorrection(correctionText.value, removeBrackets.checked);
+            const manualRulesMap = newlyAddedRules.value.trim() ? parseNewCorrectionFormat(newlyAddedRules.value, false).map : {};
+            const globallyRevertedRules = new Set();
+            document.querySelectorAll('.revert-rule:checked').forEach(cb => {
+                globallyRevertedRules.add(cb.dataset.ruleOriginal.replace(/\\/g, ''));
+            });
+            const instanceRevertedKeys = new Set();
+            document.querySelectorAll('.revert-instance:checked').forEach(cb => {
+                const original = cb.dataset.ruleOriginal.replace(/\\/g, '');
+                const replacement = decodeURIComponent(cb.dataset.ruleReplacement);
+                const key = `${cb.dataset.itemIndex}-${original}->${replacement}`;
+                instanceRevertedKeys.add(key);
+            });
+            for (const itemIndex in appliedCorrectionsData) {
+                const lineData = appliedCorrectionsData[itemIndex];
+                if (!lineData) continue;
+                for (const ruleApplied of lineData.rulesApplied) {
+                    const original = ruleApplied.from;
+                    const replacement = ruleApplied.to;
+                    const instanceKey = `${itemIndex}-${original}->${replacement}`;
+                    const isGloballyCancelled = globallyRevertedRules.has(original);
+                    const isInstanceCancelled = instanceRevertedKeys.has(instanceKey);
+                    if (!isGloballyCancelled && !isInstanceCancelled) {
+                        const exclusions = initialCorrectionMap[original]?.exclusions || [];
+                        addRuleToConsolidate(original, replacement, [parseInt(itemIndex, 10)], exclusions);
+                    }
+                }
+            }
+            for (const original in manualRulesMap) {
+                const rule = manualRulesMap[original];
+                addRuleToConsolidate(original, rule.replacement, rule.lineNumbers, rule.exclusions);
+            }
+            const finalRulesContent = [];
+            for (const [original, replacementMap] of consolidatedRules.entries()) {
+                for (const [replacementKey, data] of replacementMap.entries()) {
+                    const exclusionStr = Array.from(data.exclusions).join(',');
+                    const linesStr = Array.from(data.lineNumbers).sort((a, b) => a - b).join(',');
+                    const replacementStr = replacementKey === '___NULL___' ? '' : replacementKey;
+                    let ruleString = `-<${original}[${replacementStr}]`;
+                    if (exclusionStr || linesStr) {
+                        ruleString += `|${exclusionStr || ''}|${linesStr || ''}`;
+                    }
+                    ruleString += '>';
+                    finalRulesContent.push(ruleString);
+                }
+            }
+            if (finalRulesContent.length === 0) {
+                alert("沒有可下載的有效修正詞（所有項目可能都已被取消）。");
+                return;
+            }
+            downloadFile(finalRulesContent.join('\n'), 'final_corrections.txt', 'text/plain;charset=utf-8');
+        };
+		// 找到並修改 bottomBarDownloadSubBtn.addEventListener
+		bottomBarDownloadSubBtn.addEventListener('click', () => {
+			// [新功能] 不再直接下載，而是打開格式選擇彈窗
+			openModal(downloadFormatModal);
+		});
+		downloadCurrentFormatBtn.addEventListener('click', () => { 
+			downloadFinalSub(); // 不帶參數調用，將觸發下載
+			closeModal(downloadFormatModal); 
+		});
+		downloadYouTubeVttBtn.addEventListener('click', () => {
+			// 這個邏輯與 downloadFinalSub 非常相似，但最後多一步格式轉換
+			const originalSubText = subtitleText.value;
+			if (!originalSubText) {
+				alert("沒有原始字幕。");
+				return;
+			}
+			
+			// 1. 合併所有規則來源 (與 downloadFinalSub 相同)
+			const baseCorrectionMap = parseCorrection(correctionText.value, removeBrackets.checked);
+			const newRulesText = newlyAddedRules.value;
+			const newCorrectionMap = newRulesText ? parseNewCorrectionFormat(newRulesText, false).map : {};
+			const finalCorrectionMap = { ...baseCorrectionMap, ...newCorrectionMap };
+
+			// 2. 收集所有取消狀態 (與 downloadFinalSub 相同)
+			const globallyReverted = new Set();
+			document.querySelectorAll('.revert-rule:checked').forEach(cb => {
+				globallyReverted.add(cb.dataset.ruleOriginal.replace(/\\/g, ''));
+			});
+			const instanceReverted = new Set();
+			document.querySelectorAll('.revert-instance:checked').forEach(cb => {
+				const original = cb.dataset.ruleOriginal.replace(/\\/g, '');
+				const replacement = decodeURIComponent(cb.dataset.ruleReplacement);
+				const key = `${cb.dataset.itemIndex}-${original}->${replacement}`;
+				instanceReverted.add(key);
+			});
+
+			// 3. 呼叫核心引擎得到修正後的資料 (與 downloadFinalSub 相同)
+			const engineResult = buildFinalCorrectedText(
+				currentParsedSubs,
+				finalCorrectionMap,
+				{ globallyReverted, instanceReverted, overriddenExclusionHits }
+			);
+
+			// 4. [新功能] 將修正後的資料傳給新的轉換函式
+			const youtubeVttContent = convertToYouTubeVtt(engineResult.modifiedData);
+
+			const originalFileName = getFileName(subtitleFile, 'subtitle.txt');
+			const baseName = originalFileName.substring(0, originalFileName.lastIndexOf('.'));
+			// 確保副檔名是 .vtt
+			downloadFile(youtubeVttContent, `${baseName}_youtube.vtt`, 'text/vtt;charset=utf-8');
+			
+			closeModal(downloadFormatModal);
+		});
+
+		downloadFormatCloseBtn.addEventListener('click', () => {
+			closeModal(downloadFormatModal);
+		});
+        bottomBarDownloadRulesBtn.addEventListener('click', downloadFinalRules);
+        outputLogContainer.addEventListener('click', handleDiffLineClick);
+        controlsColumn.addEventListener('click', handleDiffLineClick);
+        correctionSummaryContainer.addEventListener('click', handleDiffLineClick);
+		hideCancelledRulesToggle.addEventListener('change', refreshCorrectionUI);
+        toggleRevertControlsBtn.addEventListener('click', () => {
+            revertControlsVisible = !revertControlsVisible;
+            outputLog.querySelectorAll('.revert-controls').forEach(control => {
+                control.style.display = revertControlsVisible ? 'block' : 'none';
+            });
+            toggleRevertControlsBtn.textContent = revertControlsVisible ? '隱藏選項' : '顯示選項';
+        });
+        modalCloseBtn.addEventListener('click', () => closeModal(correctionModal));
+        modalSelectAll.addEventListener('click', () => { modalCorrectionList.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true); if(modalTitle.textContent.includes('所有被隱藏的項目')) modalCorrectionList.dispatchEvent(new Event('change')); });
+        modalDeselectAll.addEventListener('click', () => { modalCorrectionList.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); if(modalTitle.textContent.includes('所有被隱藏的項目')) modalCorrectionList.dispatchEvent(new Event('change')); });
+        modalCorrectionList.addEventListener('click', (event) => { const navLink = event.target.closest('a.modal-nav-link'); const ruleLink = event.target.closest('a.modal-rule-link'); if (navLink) { event.preventDefault(); event.stopPropagation(); const lineNumber = navLink.dataset.navIndex; if (lineNumber) navigateToSubtitleLine(lineNumber); return; } if (ruleLink) { event.preventDefault(); event.stopPropagation(); const from = ruleLink.dataset.ruleFrom; const to = ruleLink.dataset.ruleTo; if(from && to) showRuleManagementModal(from, to); return; } });
+        
+        modalApplyBtn.addEventListener('click', () => {
+            const modalType = modalApplyBtn.dataset.modalType;
+            if (modalType === 'unhide-items') {
+                modalCorrectionList.querySelectorAll('.modal-unhide-cb:checked').forEach(modalCb => {
+                    const itemIndex = modalCb.dataset.targetLineIndex;
+                    const action = modalCb.dataset.action;
+                    const ruleOriginal = modalCb.dataset.ruleOriginal;
+                    const ruleKey = modalCb.dataset.ruleKey;
+                    const line = outputLog.querySelector(`.diff-line[data-item-index-line="${itemIndex}"]`);
+                    
+                    if (line) {
+                        if (action === 'unarchive') {
+                            line.dataset.archived = 'false';
+                            if (globallyArchivedRules.has(ruleKey)) {
+                                const archiveCb = line.querySelector(`.archive-rule-checkbox[data-all-rule-keys*='"${ruleKey}"']`);
+                                if (archiveCb && archiveCb.checked) {
+                                    archiveCb.click();
+                                }
+                            }
+                        } else if (action === 'unrevert') {
+                            const instanceCb = line.querySelector(`.revert-instance[data-rule-original="${ruleOriginal}"]`);
+                            if (instanceCb) instanceCb.checked = false;
+                            
+                            const globalRevertCheckboxes = document.querySelectorAll(`.revert-rule[data-rule-original="${ruleOriginal}"]`);
+                            globalRevertCheckboxes.forEach(cb => cb.checked = false);
+                        }
+                    }
+                });
+                alert('已恢復所選項目的顯示。');
+            }
+            refreshCorrectionUI();
+            closeModal(correctionModal);
+        });
+
+        ruleManagementCloseBtn.addEventListener('click', () => closeModal(ruleManagementModal));
+        ruleManagementSelectAll.addEventListener('click', () => { ruleManagementModalList.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true); });
+        ruleManagementDeselectAll.addEventListener('click', () => { ruleManagementModalList.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); });
+        ruleManagementModalList.addEventListener('click', (event) => { const navLink = event.target.closest('a.modal-nav-link'); if (navLink) { event.preventDefault(); event.stopPropagation(); const lineNumber = navLink.dataset.navIndex; if (lineNumber) navigateToSubtitleLine(lineNumber); } });
+        ruleManagementArchiveBtn.addEventListener('click', () => { const itemsToArchive = []; ruleManagementModalList.querySelectorAll('.modal-revert-cb:checked').forEach(cb => { const itemIndex = cb.dataset.targetIndex; const line = outputLog.querySelector(`.diff-line[data-item-index-line="${itemIndex}"]`); if (line) { line.dataset.archived = 'true'; } itemsToArchive.push(cb.closest('li')); }); if (itemsToArchive.length === 0) { alert("請先勾選要歸檔的項目。"); return; } itemsToArchive.forEach(li => li.remove()); alert(`${itemsToArchive.length} 個項目已歸檔。`); updateHiddenRules(); if (ruleManagementModalList.querySelectorAll('li').length === 0) { closeModal(ruleManagementModal); } });
+		// [大師級修正] 確保在彈窗中套用選擇後，能觸發主畫面的即時刷新
+		ruleManagementApplyBtn.addEventListener('click', () => {
+			ruleManagementModalList.querySelectorAll('.modal-revert-cb').forEach(modalCb => {
+				const itemIndex = modalCb.dataset.targetIndex;
+				const ruleOriginal = modalCb.dataset.ruleOriginal;
+				const mainInstanceCheckbox = outputLog.querySelector(`.revert-instance[data-item-index="${itemIndex}"][data-rule-original="${ruleOriginal}"]`);
+				if (mainInstanceCheckbox) {
+					// 只更新主UI上的checkbox狀態，但不觸發刷新
+					mainInstanceCheckbox.checked = !modalCb.checked;
+				}
+			});
+			// 在所有checkbox狀態更新後，統一呼叫一次刷新引擎
+			refreshCorrectionUI(); 
+			alert('選擇已更新。');
+			closeModal(ruleManagementModal);
+		});
+        addedRulesSaveChangesBtn.addEventListener('click', () => { newlyAddedRules.value = addedRulesTextarea.value; alert('已儲存手動新增的規則！'); closeModal(addedRulesModal); });
+        addedRulesCloseBtn.addEventListener('click', () => closeModal(addedRulesModal));
+        listAddedRulesBtn.addEventListener('click', () => showAddedRulesModal());
+        newRuleCloseBtn.addEventListener('click', () => closeModal(newRuleModal));
+		// [大師級修正] 為 newRuleConfirmBtn 的事件監聽器注入即時刷新能力
+		newRuleConfirmBtn.addEventListener('click', () => {
+			const original = document.getElementById('modal-rule-original').value.trim();
+			const replacement = document.getElementById('modal-rule-replacement').value.trim();
+			const exclusion = document.getElementById('modal-rule-exclusion').value.trim();
+			const lines = document.getElementById('modal-rule-lines').value.trim();
+			
+			if (!original) {
+				alert('「原始字幕」欄位不可為空！');
+				return;
+			}
+			
+			let ruleString = `-<${original}[${replacement}]`;
+			if (exclusion || lines) {
+				ruleString += `|${exclusion || ''}|${lines || ''}`;
+			}
+			ruleString += '>';
+			
+			// 將新規則附加到隱藏的 textarea 中
+			newlyAddedRules.value += (newlyAddedRules.value ? '\n' : '') + ruleString;
+			alert(`已新增規則:\n${ruleString}`);
+			
+			closeModal(newRuleModal); // 先關閉彈窗
+			
+			// 核心改動：呼叫UI刷新引擎，讓主畫面即時反應新規則！
+			refreshCorrectionUI();
+		});
+        windowStackingToggle.addEventListener('change', saveSettings);
+        defaultShowRevertToggle.addEventListener('change', saveSettings);
+		toggleFollowBtn.addEventListener('click', () => {
+			// 直接呼叫新的狀態管理函式
+			setFollowState(!followVideoToggle.checked);
+		});
+        videoSettingsCloseBtn.addEventListener('click', () => { document.getElementById('video-controls-section-wrapper').appendChild(videoControlsSection); closeModal(videoSettingsModal); });
+        
+        modalListExclusionsBtn.addEventListener('click', () => showExclusionHitsModal());
+        exclusionListModalCloseBtn.addEventListener('click', () => closeModal(exclusionListModal));
+        exclusionListModalConfirmBtn.addEventListener('click', () => {
+            overriddenExclusionHits.clear();
+            exclusionListModalContent.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                overriddenExclusionHits.add(cb.dataset.hitKey);
+            });
+            alert(`已更新 ${overriddenExclusionHits.size} 項避免修正的覆寫設定。`);
+            closeModal(exclusionListModal);
+        });
+        exclusionListModalContent.addEventListener('click', (event) => { const navLink = event.target.closest('a.modal-nav-link'); if(navLink) { event.preventDefault(); navigateToSubtitleLine(navLink.dataset.navIndex); } });
+
+		// [大師級修正 V5 - 最終版] 根據使用者精準回饋，重寫預覽邏輯
+		function previewCorrectedSubtitle() {
+			if (currentParsedSubs.length === 0) {
+				alert("沒有原始字幕可供預覽。");
+				return;
+			}
+
+			// 1. 獲取所有規則的來源
+			const baseCorrectionMap = parseCorrection(correctionText.value, removeBrackets.checked);
+			const newRulesMap = newlyAddedRules.value ? parseNewCorrectionFormat(newlyAddedRules.value, false).map : {};
+			const finalCorrectionMap = { ...baseCorrectionMap, ...newRulesMap };
+
+			// 2. 識別出哪些是「新規則」和「已歸檔規則」
+			const newRuleOriginals = Object.keys(newRulesMap);
+			// globallyArchivedRules 是一個 Set，儲存了格式為 "original -> replacement" 的字串
+
+			// 3. 建立一個專為預覽使用的、經過嚴格篩選的規則地圖
+			const previewCorrectionMap = {};
+			for (const original in finalCorrectionMap) {
+				const rule = finalCorrectionMap[original];
+				const replacement = rule.replacement === null ? '' : rule.replacement;
+				const ruleKey = `${original} -> ${replacement}`;
+
+				// 只有當規則是「新規則」或「已歸檔規則」時，才將其加入預覽地圖
+				if (newRuleOriginals.includes(original) || globallyArchivedRules.has(ruleKey)) {
+					previewCorrectionMap[original] = rule;
+				}
+			}
+			
+			// 4. 使用這個高度篩選過的規則地圖去呼叫核心引擎
+			// 傳入一個空的取消狀態，因為我們是基於白名單而不是黑名單
+			const engineResult = buildFinalCorrectedText(
+				currentParsedSubs,
+				previewCorrectionMap,
+				{} 
+			);
+
+			// 5. 重建並顯示預覽字幕
+			const previewContent = rebuildSubtitle(engineResult.modifiedData);
+			
+			if (typeof previewContent === 'string') {
+				subtitleText.value = previewContent;
+				handleSubtitleTextChange(); 
+				alert("字幕預覽已更新！\n（僅顯示「已歸檔」或「手動新增」的規則所造成的變更）");
+			} else {
+				console.error("無法生成預覽內容。");
+			}
+		}
+
+        const handleCloseVideo = () => {
+            floatingVideoContainer.style.display = 'none';
+            toggleVideoPlayerCheckbox.checked = false;
+            if (unpinOnCloseToggle.checked && pinVideoPlayerCheckbox.checked) {
+                setPlayerPinned(false);
+            }
+            if(audioOnlyModeCheckbox.checked) {
+                setAudioOnlyMode(false);
+            }
+            cleanupCurrentPlayer(!videoKeepPlayingOnCloseToggle.checked);
+        };
+        toggleVideoPlayerCheckbox.addEventListener('change', () => {
+            if (!toggleVideoPlayerCheckbox.checked) {
+                handleCloseVideo();
+            } else {
+                floatingVideoContainer.style.display = 'flex';
+            }
+        });
+        closeVideoBtn.addEventListener('click', handleCloseVideo);
+
+        pinVideoBtn.addEventListener('click', () => setPlayerPinned(!pinVideoPlayerCheckbox.checked));
+        pinVideoPlayerCheckbox.addEventListener('change', (e) => setPlayerPinned(e.target.checked));
+        audioOnlyModeCheckbox.addEventListener('change', (e) => setAudioOnlyMode(e.target.checked));
+        minimizePlayerBtn.addEventListener('click', () => setAudioOnlyMode(!audioOnlyModeCheckbox.checked));
+        globalPauseBtn.addEventListener('click', togglePlayback);
+		rewindBtn.addEventListener('click', () => seekVideo(-5));
+		forwardBtn.addEventListener('click', () => seekVideo(5));
+		// 修改現有的 keydown 事件監聽器
+		document.addEventListener('keydown', (e) => {
+			if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return; // 焦點在輸入框時忽略
+
+			if (e.key === 'F8') {
+				e.preventDefault();
+				togglePlayback();
+			} else if (e.key === 'F9') { // [新功能]
+				e.preventDefault();
+				seekVideo(-5);
+			} else if (e.key === 'F10') { // [新功能]
+				e.preventDefault();
+				seekVideo(5);
+			}
+		});
+
+        videoKeepPlayingOnCloseToggle.addEventListener('change', () => { videoReleaseMemoryOnCloseToggle.disabled = videoKeepPlayingOnCloseToggle.checked; if (videoKeepPlayingOnCloseToggle.checked) { videoReleaseMemoryOnCloseToggle.checked = false; } });
+        videoHeader.addEventListener('mousedown', startDrag);
+        videoHeader.addEventListener('touchstart', startDrag);
+        loadVideoBtn.addEventListener('click', () => loadVideo());
+        localVideoFile.addEventListener('change', loadLocalVideo);
+		// [大師級修正] 為新按鈕綁定事件
+		previewSubtitleBtn.addEventListener('click', previewCorrectedSubtitle);
+		followVideoToggleModal.addEventListener('change', (e) => {
+			setFollowState(e.target.checked);
+		});		
+        
+        function sanitizeCorrectionRules(text) {
+            const ruleRegex = /(-<(.+?)\[(.*?)\])(?:\|(.*?))?(>)/s;
+            const lines = text.split('\n');
+            const sanitizedLines = lines.map(line => {
+                const match = line.trim().match(ruleRegex);
+                if (!match) return line;
+
+                const original = match[2].trim();
+                const extras = match[4] || '';
+                
+                const parts = extras.split('|').map(p => p.trim());
+                let exclusionsStr = '';
+                let lineNumbersStr = '';
+                 if (parts.length === 2) {
+                    exclusionsStr = parts[0];
+                    lineNumbersStr = parts[1];
+                } else if (parts.length === 1) {
+                    if (/^[\d\s,]*$/.test(parts[0])) {
+                        lineNumbersStr = parts[0];
+                    } else {
+                        exclusionsStr = parts[0];
+                    }
+                }
+                
+                if (!exclusionsStr) return line;
+
+                const exclusions = exclusionsStr.split(',').map(e => e.trim()).filter(Boolean);
+                const sanitizedExclusions = exclusions.filter(excl => excl !== original);
+
+                if (exclusions.length === sanitizedExclusions.length) return line;
+
+                const newExclusionsStr = sanitizedExclusions.join(',');
+                return `${match[1]}|${newExclusionsStr}|${lineNumbersStr}${match[5]}`;
+            });
+            return sanitizedLines.join('\n');
+        }
+        
+        function showExclusionHitsModal() {
+            const correctionMap = parseCorrection(correctionText.value, removeBrackets.checked);
+            if (Object.keys(correctionMap).length === 0) {
+                alert("修正詞庫中沒有任何規則。"); return;
+            }
+            const hits = [];
+            currentParsedSubs.forEach(item => {
+                for (const original in correctionMap) {
+                    const rule = correctionMap[original];
+                    if (rule.exclusions && rule.exclusions.length > 0 && item.text.includes(original)) {
+                         for (const exclusion of rule.exclusions) {
+                            if (item.text.includes(exclusion)) {
+                                if (exclusion.includes(original)) {
+                                    hits.push({
+                                        itemIndex: item.index,
+                                        originalText: item.text,
+                                        ruleOriginal: original,
+                                        ruleReplacement: rule.replacement,
+                                        hitExclusion: exclusion
+                                    });
+                                    break; 
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            exclusionListModalTitle.innerHTML = `因「避免修正」而跳過的字幕行 (${hits.length} 處)`;
+            exclusionListModalContent.innerHTML = '';
+
+            if (hits.length === 0) {
+                exclusionListModalContent.innerHTML = '<li>未發現因「避免修正」而跳過的字幕行。</li>';
+            } else {
+                hits.forEach(hit => {
+                    const li = document.createElement('li');
+                    const highlightedText = hit.originalText.replace(
+                        new RegExp(escapeRegExp(hit.hitExclusion), 'g'),
+                        `<span class="highlight">${hit.hitExclusion}</span>`
+                    );
+                    const hitKey = `${hit.itemIndex}-${hit.ruleOriginal}-${hit.hitExclusion}`;
+                    const isChecked = overriddenExclusionHits.has(hitKey);
+
+                    li.innerHTML = `<label>
+                                      <input type="checkbox" data-hit-key="${hitKey}" ${isChecked ? 'checked' : ''}>
+                                      <div>
+                                        <div><a href="#" class="modal-nav-link" data-nav-index="${hit.itemIndex}">行 ${hit.itemIndex}</a>: ${highlightedText}</div>
+                                        <div style="font-size: 0.9em; color: var(--text-color-muted); padding-left: 1rem;">(跳過規則: <span class="from">${hit.ruleOriginal}</span> → <span class="to">${hit.ruleReplacement}</span>，因偵測到 "<span class="highlight">${hit.hitExclusion}</span>")</div>
+                                      </div>
+                                    </label>`;
+                    exclusionListModalContent.appendChild(li);
+                });
+            }
+            openModal(exclusionListModal);
+        }
+
+        loadTheme();
+        loadSettings(); 
+        handleSubtitleTextChange();
+    });
+    </script>
+</body>
+</html>
