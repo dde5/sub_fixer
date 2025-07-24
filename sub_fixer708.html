@@ -583,7 +583,22 @@
             </div>
         </div>
     </div>
-
+    <!-- [新功能] 下載規則格式選擇彈窗 -->
+    <div id="downloadRulesModal" class="modal-overlay">
+        <div class="modal-container" style="max-width: 450px;">
+            <div class="modal-header"><h3>選擇下載規則的格式</h3></div>
+            <div class="modal-content">
+                <p>請選擇您想下載的修正詞規則檔案格式：</p>
+                <div class="button-group" style="margin-top: 1.5rem; flex-direction: column; gap: 0.75rem;">
+                    <button id="downloadRulesWithLinesBtn">下載當前規則 (包含行號限制)</button>
+                    <button id="downloadRulesWithoutLinesBtn" class="secondary">下載通用規則 (移除所有行號限制)</button>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: flex-end;">
+                <button id="downloadRulesCloseBtn" class="secondary">取消</button>
+            </div>
+        </div>
+    </div>
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -1076,16 +1091,19 @@
         function parseOldCorrectionFormat(text, shouldRemoveBrackets) { const corrections = {}; const lines = text.split('\n').filter(Boolean); const originalPrefix = '- 原始字幕內容：'; const correctedPrefix = '- 建議修正內容：'; for (let i = 0; i < lines.length - 1; i++) { if (lines[i].startsWith(originalPrefix) && lines[i + 1].startsWith(correctedPrefix)) { const originalText = lines[i].substring(originalPrefix.length).trim(); let correctedText = lines[i + 1].substring(correctedPrefix.length).trim(); if (correctedText === "(保留原樣)") { correctedText = null; } else if (shouldRemoveBrackets) { correctedText = correctedText.replace(/（[^）]*）/g, '').replace(/\([^\)]*\)/g, '').trim(); } originalText.split(',').map(o => o.trim()).filter(Boolean).forEach(o => { corrections[o] = correctedText; }); i++; } } return { map: corrections }; };
         function parseNewCorrectionFormat(text, shouldRemoveBrackets) { const corrections = {}; const ruleRegex = /-<(.*?)\[(.*?)\](?:\|(.*))?>/s; const lineNumRegex = /^[\d\s,]*$/; text.split('\n').forEach(line => { const match = line.trim().match(ruleRegex); if (match) { const original = match[1].trim(); let corrected = match[2].trim(); const extras = match[3] || ''; if (shouldRemoveBrackets) { corrected = corrected.replace(/（[^）]*）/g, '').replace(/\([^\)]*\)/g, '').trim(); } if (original) { const parts = extras.split('|').map(p => p.trim()); let exclusionsStr = ''; let lineNumbersStr = ''; if (parts.length === 2) { exclusionsStr = parts[0]; lineNumbersStr = parts[1]; } else if (parts.length === 1 && parts[0]) { if (lineNumRegex.test(parts[0])) { lineNumbersStr = parts[0]; } else { exclusionsStr = parts[0]; } } const exclusions = exclusionsStr ? exclusionsStr.split(',').map(e => e.trim()).filter(Boolean) : []; const lineNumbers = lineNumbersStr ? lineNumbersStr.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n)) : []; corrections[original] = { replacement: corrected === '' ? null : corrected, exclusions: exclusions, lineNumbers: lineNumbers }; } } }); return { map: corrections }; };
         function parseCorrection(text, shouldRemoveBrackets) { const newMap = parseNewCorrectionFormat(text, shouldRemoveBrackets).map; if (Object.keys(newMap).length > 0) return newMap; const oldMap = parseOldCorrectionFormat(text, shouldRemoveBrackets).map; const compatibleMap = {}; for (const key in oldMap) { compatibleMap[key] = { replacement: oldMap[key], exclusions: [], lineNumbers: [] }; } return compatibleMap; };
-        // 找到 applyCorrections 函式，並修改它的定義以接收取消狀態
+        // [大師終極融合版 V3] 這是最終的UI渲染函式
         function applyCorrections(parsedData, correctionMap, cancellationStatus = {}) {
             let outputLogHTML = '';
             let correctionCount = 0;
             const appliedCorrections = {};
             
-            // 使用傳入的 cancellationStatus，如果沒有傳入則使用預設的空物件
+            const { 
+                globallyReverted = new Set(), 
+                instanceReverted = new Set() 
+            } = cancellationStatus;
+
             const engineResult = buildFinalCorrectedText(parsedData, correctionMap, cancellationStatus);
             
-            // ... 後續的程式碼保持不變 ...
             const modifiedData = engineResult.modifiedData;
             const allChangesByLine = engineResult.changesByLine;
             const ruleTotalCounts = engineResult.ruleTotalCounts;
@@ -1130,11 +1148,17 @@
                     outputLogHTML += `<div class="revert-controls" style="display: none;">`;
                     
                     rulesForTag.forEach(rule => {
-                        outputLogHTML += `<label><input type="checkbox" class="revert-instance" data-item-index="${item.index}" data-rule-original="${escapeRegExp(rule.from)}" data-rule-replacement="${encodeURIComponent(rule.to)}"> 取消此行修正: "${rule.from}" → "${rule.to}"</label>`;
+                        // [關鍵修正]：在製作鎖（instanceKey）時，也對替換詞進行同樣的編碼，確保與鑰匙完全匹配。
+                        const encodedReplacement = encodeURIComponent(rule.to);
+                        const instanceKey = `${item.index}-${rule.from.replace(/\\/g, '')}->${encodedReplacement}`;
+                        const isInstanceCancelled = instanceReverted.has(instanceKey);
+                        outputLogHTML += `<label><input type="checkbox" class="revert-instance" data-item-index="${item.index}" data-rule-original="${escapeRegExp(rule.from)}" data-rule-replacement="${encodedReplacement}" ${isInstanceCancelled ? 'checked' : ''}> 取消此行修正: "${rule.from}" → "${rule.to}"</label>`;
                     });
+
                     outputLogHTML += `<hr style="border:0; border-top: 1px dashed var(--border-color); margin: 5px 0;">`;
                     rulesForTag.forEach(rule => {
-                        outputLogHTML += `<label><input type="checkbox" class="revert-rule" data-rule-original="${escapeRegExp(rule.from)}"> 取消所有規則: "${rule.from}" → "${rule.to}"   <button class="add-rule-btn secondary" style="margin-top:0.5rem; font-size: 0.9em; padding: 0.25rem 0.5rem;">新增修正規則</button></label>`;
+                        const isGloballyCancelled = globallyReverted.has(rule.from.replace(/\\/g, ''));
+                        outputLogHTML += `<label><input type="checkbox" class="revert-rule" data-rule-original="${escapeRegExp(rule.from)}" ${isGloballyCancelled ? 'checked' : ''}> 取消所有規則: "${rule.from}" → "${rule.to}"   <button class="add-rule-btn secondary" style="margin-top:0.5rem; font-size: 0.9em; padding: 0.25rem 0.5rem;">新增修正規則</button></label>`;
                     });
                     outputLogHTML += `</div></div>`;
                 }
@@ -1388,7 +1412,7 @@
         }
 
         function showAddedRulesModal() { addedRulesTextarea.value = newlyAddedRules.value; openModal(addedRulesModal); }
-        function showRuleManagementModal(from, to) { ruleManagementModalList.innerHTML = ''; let totalCount = 0; let appliedCount = 0; for (const itemIndex in appliedCorrectionsData) { const data = appliedCorrectionsData[itemIndex]; const lineEl = outputLog.querySelector(`.diff-line[data-item-index-line="${itemIndex}"]`); if (!lineEl) continue; const isRuleApplied = data.rulesApplied.some(rule => rule.from === from && rule.to === to); if (isRuleApplied) { totalCount++; if (lineEl.dataset.archived === 'true' || lineEl.dataset.archivedByRule === 'true') continue; const escapedFrom = escapeRegExp(from); const instanceCheckbox = lineEl.querySelector(`.revert-instance[data-item-index="${itemIndex}"][data-rule-original="${escapedFrom}"]`); const globalCheckboxChecked = document.querySelector(`.revert-rule[data-rule-original="${escapedFrom}"]:checked`); const isReverted = (instanceCheckbox && instanceCheckbox.checked) || (globalCheckboxChecked); if (!isReverted) { appliedCount++; } const li = document.createElement('li'); li.dataset.targetIndex = itemIndex; const originalLineText = data.originalText; const highlightedText = originalLineText.replace(new RegExp(escapedFrom, 'g'), `<span class="removed">${from}</span>`); li.innerHTML = `<label><input type="checkbox" class="modal-revert-cb" data-target-index="${itemIndex}" data-rule-original="${escapedFrom}" ${!isReverted ? 'checked' : ''}><span><a href="#" class="modal-nav-link" data-nav-index="${itemIndex}">行 ${itemIndex}</a>: ${highlightedText}</span></label>`; ruleManagementModalList.appendChild(li); } } const cancelledCount = totalCount - appliedCount; ruleManagementModalTitle.innerHTML = `管理規則: <span class="from">${from}</span> → <span class="to">${to}</span>  <span class="modal-count-summary">(總共${totalCount}條 / 應用項:${appliedCount} / 取消項:${cancelledCount})</span>`; openModal(ruleManagementModal); }
+        function showRuleManagementModal(from, to) { ruleManagementModalList.innerHTML = ''; let totalCount = 0; let appliedCount = 0; for (const itemIndex in appliedCorrectionsData) { const data = appliedCorrectionsData[itemIndex]; const lineEl = outputLog.querySelector(`.diff-line[data-item-index-line="${itemIndex}"]`); if (!lineEl) continue; const isRuleApplied = data.rulesApplied.some(rule => rule.from === from && rule.to === to); if (isRuleApplied) { totalCount++; if (lineEl.dataset.archived === 'true' || lineEl.dataset.archivedByRule === 'true') continue; const escapedFrom = escapeRegExp(from); const instanceCheckbox = lineEl.querySelector(`.revert-instance[data-item-index="${itemIndex}"][data-rule-original="${escapedFrom}"]`); const globalCheckboxChecked = document.querySelector(`.revert-rule[data-rule-original="${escapedFrom}"]:checked`); const isReverted = (instanceCheckbox && instanceCheckbox.checked) || (globalCheckboxChecked); if (!isReverted) { appliedCount++; } const li = document.createElement('li'); li.dataset.targetIndex = itemIndex; const originalLineText = data.originalText; const highlightedText = originalLineText.replace(new RegExp(escapedFrom, 'g'), `<span class="removed">${from}</span>`); li.innerHTML = `<label><input type="checkbox" class="modal-revert-cb" data-target-index="${itemIndex}" data-rule-original="${escapedFrom}" data-rule-replacement="${encodeURIComponent(to)}" ${!isReverted ? 'checked' : ''}><span><a href="#" class="modal-nav-link" data-nav-index="${itemIndex}">行 ${itemIndex}</a>: ${highlightedText}</span></label>`; ruleManagementModalList.appendChild(li); } } const cancelledCount = totalCount - appliedCount; ruleManagementModalTitle.innerHTML = `管理規則: <span class="from">${from}</span> → <span class="to">${to}</span>  <span class="modal-count-summary">(總共${totalCount}條 / 應用項:${appliedCount} / 取消項:${cancelledCount})</span>`; openModal(ruleManagementModal); }
         
         function showHiddenItemsModal(baseTitle, filterFn) {
             const updateTitleWithCount = (listElement, titleElement) => {
@@ -1517,7 +1541,6 @@
             const parsedData = currentParsedSubs;
             if (parsedData.length === 0) { return; }
 
-            // 組合來自修正詞庫和手動新增的所有規則
             const baseCorrectionMap = parseCorrection(correction, removeBrackets.checked);
             const newRulesText = newlyAddedRules.value;
             const newCorrectionMap = newRulesText ? parseNewCorrectionFormat(newRulesText, false).map : {};
@@ -1529,7 +1552,6 @@
                  return;
             }
              
-            // ===> [關鍵修正]：在重新渲染前，先收集當前的取消狀態 <===
             const globallyReverted = new Set();
             document.querySelectorAll('.revert-rule:checked').forEach(cb => {
                 globallyReverted.add(cb.dataset.ruleOriginal.replace(/\\/g, ''));
@@ -1538,23 +1560,20 @@
             const instanceReverted = new Set();
             document.querySelectorAll('.revert-instance:checked').forEach(cb => {
                 const original = cb.dataset.ruleOriginal.replace(/\\/g, '');
-                const replacement = decodeURIComponent(cb.dataset.ruleReplacement);
+                // [關鍵修正]：不再解碼，直接使用 checkbox 上儲存的、已經編碼過的字串作為鑰匙的一部分。
+                const replacement = cb.dataset.ruleReplacement; 
                 const key = `${cb.dataset.itemIndex}-${original}->${replacement}`;
                 instanceReverted.add(key);
             });
             
-            const cancellationStatus = { globallyReverted, instanceReverted, overriddenExclusionHits };
-
-            // ===> [關鍵修正]：將收集到的取消狀態傳入核心引擎 <===
-            const engineResult = buildFinalCorrectedText(parsedData, finalCorrectionMap, cancellationStatus);
+			const cancellationStatus = { globallyReverted, instanceReverted, overriddenExclusionHits };
             
-            // 重新產生修正結果的 HTML
+            // 傳遞包含精準鑰匙的狀態
             const result = applyCorrections(parsedData, finalCorrectionMap, cancellationStatus);
 
-            // 更新全域變數和UI
             appliedCorrectionsData = result.appliedCorrections; 
             totalCorrectionsCount = result.correctionCount; 
-            correctedSubtitle = rebuildSubtitle(engineResult.modifiedData); 
+            correctedSubtitle = rebuildSubtitle(result.modifiedData); 
             outputLog.innerHTML = result.outputLog; 
             
             if (result.correctionCount > 0) { 
@@ -1769,11 +1788,14 @@
             downloadFile(finalSubtitleContent, `${baseName}_corrected_final${extension}`, 'text/plain;charset=utf-8');
         };
         
-        const downloadFinalRules = () => {
+        const downloadFinalRules = (shouldRemoveLineNumbers = false) => {
+            // [修改] shouldRemoveLineNumbers 參數現在從函式傳入
+
             if (Object.keys(appliedCorrectionsData).length === 0 && !newlyAddedRules.value.trim()) {
                 alert("請先執行「修正字幕」或新增規則。");
                 return;
             }
+            // ... 後續的程式碼保持不變，直到產生 ruleString 的地方 ...
             const consolidatedRules = new Map();
             const addRuleToConsolidate = (original, replacement, lineNumbers, exclusions = []) => {
                 const replacementKey = replacement === null ? '___NULL___' : replacement;
@@ -1797,7 +1819,7 @@
             const instanceRevertedKeys = new Set();
             document.querySelectorAll('.revert-instance:checked').forEach(cb => {
                 const original = cb.dataset.ruleOriginal.replace(/\\/g, '');
-                const replacement = decodeURIComponent(cb.dataset.ruleReplacement);
+                const replacement = cb.dataset.ruleReplacement; // 使用已經編碼的字串
                 const key = `${cb.dataset.itemIndex}-${original}->${replacement}`;
                 instanceRevertedKeys.add(key);
             });
@@ -1807,7 +1829,7 @@
                 for (const ruleApplied of lineData.rulesApplied) {
                     const original = ruleApplied.from;
                     const replacement = ruleApplied.to;
-                    const instanceKey = `${itemIndex}-${original}->${replacement}`;
+                    const instanceKey = `${itemIndex}-${original}->${encodeURIComponent(replacement)}`;
                     const isGloballyCancelled = globallyRevertedRules.has(original);
                     const isInstanceCancelled = instanceRevertedKeys.has(instanceKey);
                     if (!isGloballyCancelled && !isInstanceCancelled) {
@@ -1824,11 +1846,16 @@
             for (const [original, replacementMap] of consolidatedRules.entries()) {
                 for (const [replacementKey, data] of replacementMap.entries()) {
                     const exclusionStr = Array.from(data.exclusions).join(',');
-                    const linesStr = Array.from(data.lineNumbers).sort((a, b) => a - b).join(',');
+                    const linesStr = shouldRemoveLineNumbers ? '' : Array.from(data.lineNumbers).sort((a, b) => a - b).join(',');
                     const replacementStr = replacementKey === '___NULL___' ? '' : replacementKey;
+                    
                     let ruleString = `-<${original}[${replacementStr}]`;
+
                     if (exclusionStr || linesStr) {
-                        ruleString += `|${exclusionStr || ''}|${linesStr || ''}`;
+                         ruleString += `|${exclusionStr || ''}`;
+                         if (linesStr) {
+                             ruleString += `|${linesStr}`;
+                         }
                     }
                     ruleString += '>';
                     finalRulesContent.push(ruleString);
@@ -1838,8 +1865,26 @@
                 alert("沒有可下載的有效修正詞（所有項目可能都已被取消）。");
                 return;
             }
-            downloadFile(finalRulesContent.join('\n'), 'final_corrections.txt', 'text/plain;charset=utf-8');
+            const fileName = shouldRemoveLineNumbers ? 'final_corrections_no_lines.txt' : 'final_corrections.txt';
+            downloadFile(finalRulesContent.join('\n'), fileName, 'text/plain;charset=utf-8');
         };
+
+        // 為新的彈窗和下載按鈕添加事件監聽
+        const downloadRulesModal = document.getElementById('downloadRulesModal');
+        bottomBarDownloadRulesBtn.addEventListener('click', () => {
+            openModal(downloadRulesModal);
+        });
+        document.getElementById('downloadRulesWithLinesBtn').addEventListener('click', () => {
+            downloadFinalRules(false); // 下載帶行號
+            closeModal(downloadRulesModal);
+        });
+        document.getElementById('downloadRulesWithoutLinesBtn').addEventListener('click', () => {
+            downloadFinalRules(true); // 下載不帶行號
+            closeModal(downloadRulesModal);
+        });
+        document.getElementById('downloadRulesCloseBtn').addEventListener('click', () => {
+            closeModal(downloadRulesModal);
+        });
 		// 找到並修改 bottomBarDownloadSubBtn.addEventListener
 		bottomBarDownloadSubBtn.addEventListener('click', () => {
 			// [新功能] 不再直接下載，而是打開格式選擇彈窗
@@ -1953,7 +1998,31 @@
         ruleManagementDeselectAll.addEventListener('click', () => { ruleManagementModalList.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false); });
         ruleManagementModalList.addEventListener('click', (event) => { const navLink = event.target.closest('a.modal-nav-link'); if (navLink) { event.preventDefault(); event.stopPropagation(); const lineNumber = navLink.dataset.navIndex; if (lineNumber) navigateToSubtitleLine(lineNumber); } });
         ruleManagementArchiveBtn.addEventListener('click', () => { const itemsToArchive = []; ruleManagementModalList.querySelectorAll('.modal-revert-cb:checked').forEach(cb => { const itemIndex = cb.dataset.targetIndex; const line = outputLog.querySelector(`.diff-line[data-item-index-line="${itemIndex}"]`); if (line) { line.dataset.archived = 'true'; } itemsToArchive.push(cb.closest('li')); }); if (itemsToArchive.length === 0) { alert("請先勾選要歸檔的項目。"); return; } itemsToArchive.forEach(li => li.remove()); alert(`${itemsToArchive.length} 個項目已歸檔。`); updateHiddenRules(); if (ruleManagementModalList.querySelectorAll('li').length === 0) { closeModal(ruleManagementModal); } });
-        ruleManagementApplyBtn.addEventListener('click', () => { ruleManagementModalList.querySelectorAll('.modal-revert-cb').forEach(modalCb => { const itemIndex = modalCb.dataset.targetIndex; const ruleOriginal = modalCb.dataset.ruleOriginal; const mainInstanceCheckbox = outputLog.querySelector(`.revert-instance[data-item-index="${itemIndex}"][data-rule-original="${ruleOriginal}"]`); if (mainInstanceCheckbox) { mainInstanceCheckbox.checked = !modalCb.checked; } }); alert('選擇已更新。'); updateHiddenRules(); closeModal(ruleManagementModal); });
+        ruleManagementApplyBtn.addEventListener('click', () => {
+            // 步驟 1: 將彈窗中的選擇狀態，同步到主畫面的 checkbox 上。
+            ruleManagementModalList.querySelectorAll('.modal-revert-cb').forEach(modalCb => {
+                const itemIndex = modalCb.dataset.targetIndex;
+                const ruleOriginal = modalCb.dataset.ruleOriginal;
+                const ruleReplacement = modalCb.dataset.ruleReplacement;
+                
+                const mainInstanceCheckbox = outputLog.querySelector(`.revert-instance[data-item-index="${itemIndex}"][data-rule-original="${ruleOriginal}"][data-rule-replacement="${ruleReplacement}"]`);
+
+                if (mainInstanceCheckbox) {
+                    // 核心邏輯：將主畫面的 checkbox 狀態，設置為與彈窗中的 checkbox 相反
+                    // (因為彈窗裡勾選代表"保留"，主畫面勾選代表"取消")
+                    mainInstanceCheckbox.checked = !modalCb.checked;
+                }
+            });
+
+            // 步驟 2: [關鍵修正] 只呼叫視覺更新函式，而不是全局重新計算函式。
+            // updateHiddenRules() 會根據 checkbox 的最新狀態，正確地隱藏/顯示項目，並更新頂部的統計數字。
+            // 這是一個輕量級的操作，不會破壞任何已有的狀態。
+            updateHiddenRules();
+
+            // 步驟 3: 彈出提示並關閉彈窗。
+            alert('選擇已更新。');
+            closeModal(ruleManagementModal);
+        });
         addedRulesSaveChangesBtn.addEventListener('click', () => { newlyAddedRules.value = addedRulesTextarea.value; alert('已儲存手動新增的規則！'); closeModal(addedRulesModal); });
         addedRulesCloseBtn.addEventListener('click', () => closeModal(addedRulesModal));
         listAddedRulesBtn.addEventListener('click', () => showAddedRulesModal());
@@ -1976,22 +2045,25 @@
             newlyAddedRules.value += (newlyAddedRules.value ? '\n' : '') + ruleString; 
             alert(`已新增規則:\n${ruleString}`); 
 
-            // --- THE FIX ---
-            // 即時更新修正結果預覽
-            if (totalCorrectionsCount > 0) { // 只在已經有結果時才即時更新
-                updateAndRenderOutput();
-            }
+            // ===> [關鍵修正]：執行順序徹底重構 <===
 
+            // 步驟 1: 先處理「自動取消舊規則」的邏輯，直接修改 DOM 狀態
             if (getOriginalCb.checked && getLineCb.checked && lines) { 
                 const lineNumbers = lines.split(',').map(n => n.trim()).filter(Boolean); 
                 lineNumbers.forEach(lineNumber => { 
                     const revertCheckbox = outputLog.querySelector(`.revert-instance[data-item-index="${lineNumber}"][data-rule-original="${escapeRegExp(original)}"]`); 
                     if(revertCheckbox) { 
+                        // 只是在畫面上預先勾選它，為下一步的狀態讀取做準備
                         revertCheckbox.checked = true; 
                     } 
                 }); 
-                updateHiddenRules(); 
             } 
+            
+            // 步驟 2: 只有在已經有修正結果時，才執行刷新
+            if (totalCorrectionsCount > 0) {
+                // 此時呼叫 updateAndRenderOutput()，它會讀取到包含剛剛「自動取消」操作在內的、最完整的 DOM 狀態
+                updateAndRenderOutput();
+            }
             
             closeModal(newRuleModal); 
         });
